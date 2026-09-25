@@ -1,0 +1,3 @@
+host: create3-pi@create3-pi.local
+host_key_alias: create3-pi.local
+failed_candidate_retention_count: 3

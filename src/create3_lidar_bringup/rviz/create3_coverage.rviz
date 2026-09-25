@@ -1,0 +1,166 @@
+Panels:
+- Class: rviz_common/Displays
+  Name: Displays
+- Class: rviz_common/Views
+  Name: Views
+Visualization Manager:
+  Class: ''
+  Displays:
+  - Alpha: 0.5
+    Cell Size: 1
+    Class: rviz_default_plugins/Grid
+    Color: 160; 160; 164
+    Enabled: true
+    Name: Grid
+    Plane: XY
+    Plane Cell Count: 20
+    Reference Frame: <Fixed Frame>
+  - Alpha: 0.7
+    Class: rviz_default_plugins/Map
+    Color Scheme: map
+    Draw Behind: true
+    Enabled: true
+    Name: Map
+    Topic:
+      Depth: 5
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /map
+    Update Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /map_updates
+  - Alpha: 1
+    Autocompute Intensity Bounds: true
+    Autocompute Value Bounds:
+      Max Value: 10
+      Min Value: -10
+      Value: true
+    Axis: Z
+    Channel Name: intensity
+    Class: rviz_default_plugins/LaserScan
+    Color: 255; 30; 30
+    Color Transformer: FlatColor
+    Decay Time: 0
+    Enabled: true
+    Name: LiDAR Scan
+    Position Transformer: XYZ
+    Selectable: true
+    Size (Pixels): 3
+    Size (m): 0.01
+    Style: Points
+    Topic:
+      Depth: 10
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: /scan
+    Use Fixed Frame: true
+  - Class: rviz_default_plugins/TF
+    Enabled: true
+    Frame Timeout: 15
+    Marker Scale: 0.5
+    Name: TF
+    Show Arrows: true
+    Show Axes: true
+    Show Names: true
+  - Class: rviz_default_plugins/Path
+    Name: Planned coverage
+    Enabled: true
+    Color: 0; 160; 220
+    Line Style: Lines
+    Line Width: 0.025
+    Topic:
+      Value: /coverage/route
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+      Depth: 1
+  - Class: rviz_default_plugins/Path
+    Name: Actual trajectory
+    Enabled: true
+    Color: 240; 90; 70
+    Line Style: Lines
+    Line Width: 0.025
+    Topic:
+      Value: /coverage/trajectory
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+      Depth: 1
+  - Class: rviz_default_plugins/Map
+    Name: Covered
+    Enabled: true
+    Alpha: 0.4
+    Color Scheme: costmap
+    Topic:
+      Value: /coverage/covered
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+      Depth: 1
+  - Class: rviz_default_plugins/Map
+    Name: Remaining
+    Enabled: false
+    Alpha: 0.4
+    Color Scheme: costmap
+    Topic:
+      Value: /coverage/remaining
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+      Depth: 1
+  - Class: rviz_default_plugins/MarkerArray
+    Name: Region target progress dock
+    Enabled: true
+    Topic:
+      Value: /coverage/markers
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+      Depth: 1
+  - Class: rviz_default_plugins/Marker
+    Name: Complete actual trajectory segments
+    Enabled: true
+    Topic:
+      Value: /coverage/trajectory_segments
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+      Depth: 1
+  - Class: rviz_default_plugins/PoseWithCovariance
+    Name: AMCL pose
+    Enabled: true
+    Topic:
+      Value: /amcl_pose
+      Reliability Policy: Reliable
+      Depth: 10
+  Enabled: true
+  Global Options:
+    Background Color: 35; 35; 35
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+  - Class: rviz_default_plugins/Interact
+  - Class: rviz_default_plugins/MoveCamera
+  - Class: rviz_default_plugins/Select
+  - Class: rviz_default_plugins/FocusCamera
+  - Class: rviz_default_plugins/Measure
+  - Class: rviz_default_plugins/SetInitialPose
+    Topic: /initialpose
+    X std deviation: 0.25
+    Y std deviation: 0.25
+    Theta std deviation: 0.2618
+  - Class: rviz_default_plugins/PublishPoint
+    Topic: /coverage/region_point
+    Single click: false
+  - Class: rviz_default_plugins/SetGoal
+    Topic: /coverage/test_goal
+  Views:
+    Current:
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Top Down
+      Scale: 30
+      Target Frame: map
+Window Geometry:
+  Height: 900
+  Width: 1400

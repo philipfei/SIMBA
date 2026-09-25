@@ -1,0 +1,12 @@
+/build/
+/install/
+/log/
+/reports/
+/.test_deps/
+**/__pycache__/
+*.pyc
+.pytest_cache/
+*.deb
+.env
+*.pem
+*.key

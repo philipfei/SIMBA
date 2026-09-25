@@ -1,0 +1,17 @@
+# LEGACY REFERENCE ONLY: fixed-map launch reads coverage_settings.yaml instead.
+# Three core nodes run on the Pi. PC hosts visualization and command clients only.
+/**:
+  ros__parameters:
+    use_sim_time: false
+    coverage_disk_radius_m: 0.25
+    collision_radius_m: 0.20
+    stripe_spacing_m: 0.35
+    coverage_mission_timeout_s: 1800.0
+    autonomous_linear_m_s: 0.12
+    autonomous_angular_rad_s: 0.40
+    linear_accel_m_s2: 0.15
+    angular_accel_rad_s2: 0.60
+    mapping_mode: false
+    # Runtime calibration/report data, never saved over the source map.
+    output_dir: /home/create3-pi/create3_ws/coverage_reports
+    dock_file: ''

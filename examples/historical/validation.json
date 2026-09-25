@@ -1,0 +1,36 @@
+{
+  "pytest_cases": 66,
+  "suites": [
+    {
+      "tests": 15,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "suite": "coverage_ros.xunit"
+    },
+    {
+      "tests": 26,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "suite": "coverage_core.xunit"
+    },
+    {
+      "tests": 25,
+      "errors": 0,
+      "failures": 0,
+      "skipped": 0,
+      "suite": "coverage_revision.xunit"
+    }
+  ],
+  "source_manifest_files": 35,
+  "installed_contents_verified": 28,
+  "original_map_files_preserved": 8,
+  "config_hash": "cbdec403e75cceb17ae09f0ef9efe54ac6cbfe446e700822c8cd01bc4bc82abc",
+  "candidate_counts": {
+    "equal_spacing": 14,
+    "wall_aligned": 28
+  },
+  "hardware_connected": false,
+  "deployed": false
+}
