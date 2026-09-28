@@ -6,6 +6,7 @@
 /maps/
 config/local.yaml
 .env
+.env.local
 .test_deps/
 .pytest_cache/
 **/__pycache__/
