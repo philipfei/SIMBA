@@ -1,381 +1,262 @@
 # SIMBA
 
-Create 3 + RPLIDAR A2M8 + Raspberry Pi 5, using ROS 2 Jazzy on Ubuntu 24.04.
-Edit source here. The Pi is a deployment mirror. Do not edit its generated install.
-No launch starts a mission. Robot navigation and docking remain **hardware-unverified**.
+SIMBA is a two-package ROS 2 Jazzy workspace for an iRobot Create 3 with an RPLIDAR A2M8. It keeps mapping/manual operation separate from fixed-map floor coverage. Launching a mode never starts robot motion.
 
-## Setup [PC]
+## Repository layout
 
-```bash
-cd /home/philip/Documents/SIMBA
-source modules/common/env.sh offline
-python3 tools/check_dependencies.py --role pc
+```text
+SIMBA/
+|-- README.md                  # All operator and developer instructions
+|-- LICENSE                    # Apache-2.0
+|-- requirements.yaml          # Auditable host dependencies
+|-- .env.example               # DDS/RMW shell environment examples
+`-- src/
+    |-- simba_bringup/
+    |   |-- config/
+    |   |   |-- robot_params.yaml       # Geometry, speeds, frames, safety expectation
+    |   |   |-- coverage_params.yaml    # Planning, measurement, health, deadlines
+    |   |   |-- lidar_params.yaml       # Driver and base_footprint -> laser transform
+    |   |   |-- slam_toolbox.yaml       # Mapping-only SLAM configuration
+    |   |   |-- nav2_params.yaml        # Nav2 template, rewritten at launch
+    |   |   `-- offline_maps.yaml       # Versioned map hash -> example start fixtures
+    |   |-- launch/             # lidar, manual, slam, coverage, and PC RViz launchers
+    |   |-- rviz/               # English SLAM and coverage displays
+    |   `-- simba_bringup/      # Keyboard teleop, TF relay, velocity-gate entry point
+    `-- simba_coverage/
+        |-- simba_coverage/     # Planner, preview, supervisor, meter, gate, validation
+        `-- test/               # Unit/ROS tests and a tracked trapezoid fixture map
 ```
 
-[requirements.yaml](requirements.yaml) records exact observed versions and their
-sources. Mismatches, missing packages and unverified versions are reported, not
-fixed. PC extracted test packages are not system installations. Pi versions are
-historical until checked on the connected Pi. Never install an amd64 package on arm64.
+The dependency direction is `simba_bringup -> simba_coverage`. Coverage code receives an explicit configuration directory and never imports or looks up `simba_bringup`. Runtime maps, reports, builds, local overrides, and secrets are untracked.
 
-Install missing packages deliberately using Ubuntu/ROS apt packages. For example,
-with Jazzy's apt repository already configured:
+## Fixed defaults and configuration
+
+All effective configuration uses ROS 2 YAML blocks in the form `node-selector: {ros__parameters: ...}`. The custom validator rejects missing/unknown keys, invalid ranges, and cross-file conflicts. `robot_params.yaml` stores a 0.18 m body radius and 0.02 m padding; code derives the 0.20 m collision radius. The separate 0.25 m coverage disk intentionally credits wall-adjacent floor while the body keeps its clearance. These parameters must never share one code variable.
+
+Current defaults are 0.35 m stripe spacing, 0.12 m/s linear speed, 0.40 rad/s angular speed, 90% phase-boundary completion, at most three resweep rounds, 0.5 degree direction search, and a 0.35 m minimum retained trim segment. Edit tracked defaults on the development branch, review a fresh preview, commit, and let the Pi pull the commit. Do not edit tracked YAML on the Pi: `git pull --ff-only` deliberately refuses divergent work. Host-only paths belong in shell variables or untracked `config/local.yaml`; current launch arguments are preferred because `local.yaml` is not read automatically.
+
+The configuration hash is calculated from parsed, canonical key/value data with sorted keys and exact hexadecimal floating-point tokens. Comments and key order do not change it. The approval manifest additionally covers the applicable coverage parameters, robot geometry/motion/frame values, map YAML/image SHA-256 values, reachable and coverable masks, and selected stripe family. It excludes the preview start pose, serial device, host, and deployment paths. A runtime AMCL pose may differ from the preview example start: the supervisor reprojects it into the same reachable component within the configured tolerance, recomputes connections, and refuses to start if the approved map, masks, stripe family, or effective configuration differs.
+
+## Install and build
+
+Install ROS 2 Jazzy first. The Pi obtains the LiDAR driver from apt; it is not a workspace package.
 
 ```bash
 sudo apt update
-sudo apt install python3-numpy python3-yaml python3-pil python3-matplotlib \
-  python3-pytest python3-colcon-common-extensions python3-rosdep cmake \
-  rsync openssh-client ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-rviz2
-rosdep install --from-paths src --ignore-src -r -y --rosdistro jazzy
-./tools/test.sh
+sudo apt install ros-jazzy-navigation2 ros-jazzy-nav2-bringup ros-jazzy-slam-toolbox \
+  ros-jazzy-rmw-cyclonedds-cpp ros-jazzy-irobot-create-msgs \
+  python3-colcon-common-extensions python3-numpy python3-pil python3-yaml python3-pytest
+# Pi only:
+sudo apt install ros-jazzy-rplidar-ros
+# PC visualization/preview:
+sudo apt install ros-jazzy-rviz2 python3-matplotlib
 ```
 
-`rosdep` may install runtime packages as well as build dependencies. Review its
-output. Use a new terminal for robot work: offline tests use domain 91 and localhost;
-robot operation uses domain 0 and subnet discovery. Do not mix these environments.
-
-## SSH, paths and source updates [PC]
+Build on either host. Pure planner tests build on a PC without a connected robot or LiDAR; launch-time hardware dependencies are only needed when that launch is used.
 
 ```bash
-ssh create3-pi@create3-pi.local
-# Only after verifying the current IP belongs to the Pi:
-ssh -o HostKeyAlias=create3-pi.local create3-pi@VERIFIED_IP
+export SIMBA_ROOT="$HOME/SIMBA"
+cd "$SIMBA_ROOT"
+source /opt/ros/jazzy/setup.bash
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install
+source install/setup.bash
+colcon test --event-handlers console_direct+
+colcon test-result --verbose
 ```
 
-Do not assume an old DHCP address is still the Pi. Verify changed SSH fingerprints
-before removing an obsolete key with `ssh-keygen -R create3-pi.local` (and the verified
-IP entry if needed). Never disable host-key checks. Keep passwords and keys out of Git;
-change a password if it was exposed. Use `exit` to close SSH.
+Before deployment, compare `ros2 pkg xml nav2_controller`, installed parameter declarations, and `ros2 pkg executables` against the launch configuration. The coverage launch intentionally starts only `map_server`, `amcl`, `planner_server`, `controller_server`, two lifecycle managers, the supervisor, meter, velocity gate, LiDAR/static TF, and TF relay. It does not start BT Navigator, waypoint follower, smoother server, velocity smoother, behavior server, or collision monitor. `controller_server` remaps both relative and absolute `cmd_vel` outputs to `/cmd_vel_nav`; teleop publishes `/cmd_vel_remote`; the gate is the sole `/cmd_vel` publisher. Launch and runtime graph checks enforce this per node.
 
-| Pi path | Use |
-|---|---|
-| `/home/create3-pi/create3_ws/src/create3_lidar_bringup` | Source mirror |
-| `/home/create3-pi/create3_ws/install` | Active, managed install link |
-| `/home/create3-pi/create3_ws/.simba-deploy/candidates` | Isolated versions and logs |
-| `/home/create3-pi/create3_ws/maps` | Saved maps; never deleted by deployment |
-| `/home/create3-pi/create3_ws/coverage_reports` | Runtime coverage reports and calibration |
+## DDS environment
 
-```bash
-ssh create3-pi@create3-pi.local 'ls -lh /home/create3-pi/create3_ws/maps'
-./modules/deployment/sync.sh          # Read-only remote preflight and rsync differences
-./modules/deployment/sync.sh --apply  # Sync, SHA-256 audit, build, test, check, activate
-```
-
-Edit `modules/deployment/config.yaml` for the SSH host and failed-candidate retention
-(default 3). Use `scp` for unrelated documents, not to bypass source deployment:
-`scp LOCAL_FILE create3-pi@create3-pi.local:/home/create3-pi/`;
-reverse source/destination to download a file. Deployment never starts robot motion.
-
-A failed apply prints its stage and logs. Source may have changed; the previous
-working install remains active. Fix and explicitly retry, or inspect/revert source
-manually. There is no automatic source rollback. An old normal `install/` directory
-or a symlink-install pointing into mutable source causes a preflight refusal;
-see [maintenance guidance](docs/development.md#deployment-maintenance).
-
-For the first migration of an old symlink-installed workspace, first stop keyboard
-control and all project launches. Then run on the PC:
-
-```bash
-./modules/deployment/migrate_legacy.py                 # Read-only inspection
-./modules/deployment/migrate_legacy.py --apply --stopped
-./modules/deployment/sync.sh --apply
-```
-
-`--stopped` explicitly confirms that maintenance can proceed. The migration snapshots
-the **Pi's existing source**, rebuilds an independent copy of that old version, verifies
-old executable/configuration bytes, then atomically exchanges the directory and a
-managed install link using Linux `renameat2(RENAME_EXCHANGE)`. The original install
-is retained as `.legacy-install-<candidate>/`; original build and maps are untouched.
-Only after successful validation does it enable owner-write on source-mirror directories
-needed for later rsync. No new SIMBA source is deployed until the final sync command.
-Build/validation failures leave the original installation in place. Read the printed
-log path if a stage fails; the helper does not launch nodes or install system packages.
-
-
-**After every successful apply, open a NEW clean SSH session/terminal and source
-ROS and the resolved workspace setup before launching anything.** Do not reuse a
-shell that loaded the previous overlay. Running processes are not updated or restarted.
-Old versions remain available. PC module commands use a clean, pinned remote environment.
-
-## Robot environment and basic commands [Pi]
-
-Use a fresh shell. The current robot uses no ROS namespace prefix. Verify interfaces before setting DDS:
+Copy `.env.example` to an untracked host-specific shell file, verify interface names with `ip -br address`, then source it after ROS. YAML cannot set process environment variables.
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-ip -br addr
-installed=$(readlink -f /home/create3-pi/create3_ws/install)
-source "$installed/setup.bash"
-export ROS_DOMAIN_ID=0 RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-export ROS_AUTOMATIC_DISCOVERY_RANGE=SUBNET
-export CYCLONEDDS_URI='<CycloneDDS><Domain><General><Interfaces><NetworkInterface name="eth0" priority="10" multicast="default"/><NetworkInterface name="wlan0" priority="20" multicast="default"/></Interfaces></General></Domain></CycloneDDS>'
-ros2 topic list -t
-ros2 topic echo --once /battery_state
-ros2 topic echo --once /dock_status
-ros2 action list -t
+source "$SIMBA_ROOT/.env.local"   # created by the operator and ignored by Git
+source "$SIMBA_ROOT/install/setup.bash"
 ```
 
-Battery updates may take about 5 seconds. Topic names depend on firmware; inspect
-available interfaces first. `ros2 interface show irobot_create_msgs/action/DriveDistance`
-and `.../RotateAngle` show definitions; they are not additional manual-control paths.
+Keep `ROS_DOMAIN_ID=0`, `RMW_IMPLEMENTATION=rmw_cyclonedds_cpp`, and subnet discovery aligned. Verify, rather than hardcode, the PC dedicated interface and Pi `eth0`/`wlan0` names.
 
-Native actions below **move the robot**. First stop teleop, revoke manual ownership,
-stop project launches, and verify the robot is stationary with no external velocity
-publisher. Do not send them alongside an active coverage manager:
+## Git deployment to the Pi
+
+The protected pre-refactor state is tag `pre-refactor-2026-09-28`. Before the refactor branch is merged, the Pi checks out `refactor/two-package-layout`; after review and merge it checks out `main`.
+
+Pi terminal:
 
 ```bash
-ros2 action send_goal /undock irobot_create_msgs/action/Undock '{}'
-ros2 action send_goal /dock irobot_create_msgs/action/Dock '{}' --feedback
+cd "$HOME"
+git clone git@github.com:philipfei/SIMBA.git SIMBA   # first deployment only
+cd "$HOME/SIMBA"
+git fetch --tags origin
+git checkout refactor/two-package-layout
+git pull --ff-only origin refactor/two-package-layout
+source /opt/ros/jazzy/setup.bash
+rosdep install --from-paths src --ignore-src -r -y
+colcon build --symlink-install
+source install/setup.bash
 ```
 
-Alternatively [PC], `./modules/robot/dock.py undock` or `dock` checks for project
-controllers/publishers before sending the action. Dock must be powered and nearby.
-During a coverage task use `/coverage/return_to_dock`, not a competing native action.
-`./modules/robot/status.sh` reads the battery from the PC.
+Git never transfers runtime maps. Transfer the canonical map from Pi to PC with host-key checking retained:
 
-## Manual control [PC]
-
-1. If docked, explicitly undock using the independent native-action procedure above.
-2. Start **one** sensor/safety launch: `./modules/teleop/start.sh`. For mapping,
-   use the mapping launch below instead; do not start both.
-3. In another terminal grant control, then start the keyboard:
+PC terminal:
 
 ```bash
-./modules/common/pi.py ros2 service call /control/manual std_srvs/srv/SetBool '{data: true}'
-./modules/teleop/keyboard.sh
+mkdir -p "$SIMBA_ROOT/maps/room_20260923_1338"
+scp -o HostKeyAlias=create3-pi.local -r \
+  create3-pi@create3-pi.local:~/SIMBA/maps/room_20260923_1338/. \
+  "$SIMBA_ROOT/maps/room_20260923_1338/"
+sha256sum "$SIMBA_ROOT"/maps/room_20260923_1338/map.*
 ```
 
-W/S/A/D request forward/reverse/turn; X or Space stops; Q stops and exits. Keep
-keyboard focus. Key release or lost command stream stops through timeouts.
-Manual limits are +0.25/-0.15 m/s and 0.50 rad/s. Do not publish directly to
-`/cmd_vel` or run concurrent Twist/TwistStamped publishers.
+If the runtime Pi workspace remains `~/create3_ws`, replace only `$SIMBA_ROOT` in Pi shell commands; no tracked file contains that host-specific path.
 
-Finish with Q, then revoke ownership and stop the launch with Ctrl+C:
+## PC static coverage preview
+
+A preview is a static geometric plan and ideal coverage estimate, not a closed-loop simulation. For the registered current map, the versioned example start is `(0.807, -1.575)` m. Every direction/offset candidate uses exactly that start and denominator. An unregistered map requires `--start X Y` and otherwise fails clearly.
+
+PC terminal:
 
 ```bash
-./modules/common/pi.py ros2 service call /control/manual std_srvs/srv/SetBool '{data: false}'
+cd "$SIMBA_ROOT"
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+ros2 run simba_coverage coverage_preview \
+  --map "$SIMBA_ROOT/maps/room_20260923_1338/map.yaml" \
+  --config-dir "$SIMBA_ROOT/src/simba_bringup/config" \
+  --output "$SIMBA_ROOT/output/preview-$(date +%Y%m%d-%H%M%S)"
 ```
 
-## Mapping and map download [PC]
+Review `preview.png`, `summary.json`, `candidates.json`, `route.json`, and `approval_manifest.json`. Copy the reviewed manifest to `OUTPUT_ROOT/approvals/APPROVAL_HASH.json` on the Pi and pass that hash to coverage launch. Any effective config or map change requires a new preview. The optimizer scores all direction/offset candidates in one global tolerance band, logs every raw area and selection basis, and reports dominant and next-most-supported wall angles.
 
-1. Undock explicitly if needed. Stop any fixed-map AMCL/navigation launch.
-2. Start `./modules/mapping/start.sh` (Pi SLAM, LiDAR, TF relay and safety gate).
-3. Open `./modules/mapping/rviz.sh` in another terminal. Default PC interface:
-   `enx00e17c6840b1`; override `SIMBA_PC_INTERFACE` only after checking `ip -br addr`.
-4. Grant manual ownership and use the keyboard as above. Drive slowly and verify
-   scan points stay on walls during turns; duplicated/bent walls indicate a problem.
-5. Stop the robot, leave SLAM running, then save into a **new** map directory:
+## Modes and terminal commands
+
+`manual.launch.py`, `slam.launch.py`, and `coverage.launch.py` are mutually exclusive because each owns the LiDAR/static TF and velocity gate. Run one Pi launch at a time inside `tmux`, so SSH loss does not terminate a mission.
+
+### Manual teleoperation
+
+Pi terminal:
 
 ```bash
-./modules/mapping/save_map.py --name room_NEW_TIMESTAMP
-# If already saved on the Pi, download without saving again:
-./modules/mapping/save_map.py --name room_NEW_TIMESTAMP --download-only
+tmux new -s simba-manual
+source /opt/ros/jazzy/setup.bash && source "$HOME/SIMBA/install/setup.bash"
+ros2 launch simba_bringup manual.launch.py config_dir:="$HOME/SIMBA/src/simba_bringup/config"
 ```
 
-The script calls SLAM Toolbox `save_map` and `serialize_map`, downloads the four
-files and checks SHA-256 before publishing the local folder. Existing local maps
-are never overwritten. A failed transfer can be retried with `--download-only`.
-`map.yaml` + `map.pgm` serve fixed-map localization; `.posegraph` + `.data` retain
-SLAM state. Keep all four. Results are in `maps/NAME/` on this PC.
-
-For direct [Pi] saving after creating a new directory:
+PC terminal:
 
 ```bash
-mkdir /home/create3-pi/create3_ws/maps/room_NEW_TIMESTAMP
-ros2 service call /slam_toolbox/save_map slam_toolbox/srv/SaveMap "{name: {data: '/home/create3-pi/create3_ws/maps/room_NEW_TIMESTAMP/map'}}"
-ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph "{filename: '/home/create3-pi/create3_ws/maps/room_NEW_TIMESTAMP/map'}"
+source /opt/ros/jazzy/setup.bash && source "$SIMBA_ROOT/install/setup.bash"
+ros2 run simba_bringup keyboard_teleop --config-dir "$SIMBA_ROOT/src/simba_bringup/config"
 ```
 
-Finish teleop, revoke control and stop the mapping launch. Verify wheel speeds are
-zero before the independent Dock procedure. Never infer fresh scans from a process
-or publisher count: check `ros2 topic hz /scan` and message timestamps.
+The keyboard requests `/control/manual`, sends a 10 Hz heartbeat, and publishes `/cmd_vel_remote`. Manual has priority only while explicitly leased; coverage cannot run concurrently. Key-event timeout is 0.35 s. Use `W/A/S/D`, `X` or Space to stop, and `Q` to release ownership and quit.
 
-## Offline coverage preview [PC; no robot]
+### SLAM and RViz
+
+Pi terminal:
 
 ```bash
-source modules/common/env.sh offline
-./modules/coverage/preview.py \
-  --map maps/room_20260923_1338/map.yaml --output reports/current_preview
+tmux new -s simba-slam
+source /opt/ros/jazzy/setup.bash && source "$HOME/SIMBA/install/setup.bash"
+ros2 launch simba_bringup slam.launch.py config_dir:="$HOME/SIMBA/src/simba_bringup/config"
 ```
 
-The current map has the registered example start `(0.807, -1.575)` m. This is not a
-measured robot pose. For a **new map**, first choose a safe map-frame start in metres:
+PC terminal:
 
 ```bash
-./modules/coverage/register_map.py --map maps/NEW_MAP/map.yaml --start X Y
-./modules/coverage/preview.py --map maps/NEW_MAP/map.yaml --output reports/new_preview
+source /opt/ros/jazzy/setup.bash && source "$SIMBA_ROOT/install/setup.bash"
+ros2 launch simba_bringup rviz.launch.py mode:=slam
 ```
 
-No registered start means no evaluation. `--update` permits an intentional change
-only after typing `UPDATE` in an interactive terminal. It records old/new starts
-and hashes and marks old results superseded. Use a new output folder for each run.
+Save a map on the Pi without overwriting an existing directory:
 
 ```bash
-./modules/coverage/preview.py --map maps/NEW_MAP/map.yaml \
-  --check-result reports/new_preview/summary.json
+MAP_DIR="$HOME/SIMBA/maps/room_$(date +%Y%m%d_%H%M)"
+mkdir "$MAP_DIR"
+ros2 run nav2_map_server map_saver_cli -f "$MAP_DIR/map"
+ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph \
+  "{filename: '$MAP_DIR/map'}"
 ```
 
-Outputs: PNG/SVG, world-coordinate route JSON, all candidate scores, summary and
-coverage masks. Labels are English. Green is **ideal**, not measured, coverage;
-yellow is remaining coverable area. The map is not modified. No dock pose or return
-route is invented. Use `--baseline CURRENT_REGISTERED_ROUTE_JSON` for four-panel mode.
-Historical baselines without registration hashes are rejected, not silently repaired.
-See `examples/README.md` for preserved, historical-only results.
+Then use the Pi-to-PC `scp` command above with the new directory name.
 
-Change settings in `src/create3_lidar_bringup/config/coverage_settings.yaml`, then
-regenerate preview. Defaults: 0.20 m collision radius, 0.25 m virtual coverage disk,
-0.35 m stripes, 0.12 m/s and 0.40 rad/s autonomous caps, 90% target, up to 3 resweeps.
-The larger virtual disk intentionally credits wall-adjacent floor; it is not a
-physical cleaning-tool claim. Boundary following never cancels the main sweep;
-completion is checked at phase boundaries. Fixed-map AMCL and mapping SLAM are
-separate modes. Fixed-map preview is geometric simulation, not a dynamics simulator.
+### Fixed-map coverage and RViz
 
-<a id="fixed-map-operation-and-todo-pcpihardware-unverified"></a>
-
-## Fixed-map operation and TODO [PC/Pi; hardware-unverified]
-
-First verify stationary sensors, TF, localization and command ownership; then test
-short point-to-point navigation and pause/cancel with an operator present. Complete
-an independent docking calibration/trial before a full coverage mission, since
-`/coverage/start` requires validated dock metadata. Proceed to a small area, then a room.
-
-[PC] `./modules/navigation/start.sh`, then `./modules/navigation/rviz.sh`.
-Launch does not move the robot. Use RViz **2D Pose Estimate** for the actual pose.
-For a short test, RViz **2D Goal Pose** stores a goal; explicitly call
-`/coverage/test_navigation` (Trigger) to execute it.
-
-[Pi] Select a region using `region_begin`, RViz **Publish Point** in boundary order,
-then `region_commit`. Preview before explicitly starting:
+Pi terminal, after copying the approved manifest:
 
 ```bash
-ros2 service call /coverage/region_begin std_srvs/srv/Trigger '{}'
-ros2 service call /coverage/region_commit std_srvs/srv/Trigger '{}'
+tmux new -s simba-coverage
+source /opt/ros/jazzy/setup.bash && source "$HOME/SIMBA/install/setup.bash"
+export MAP="$HOME/SIMBA/maps/room_20260923_1338/map.yaml"
+export OUTPUT_ROOT="$HOME/SIMBA/output"
+export APPROVED_HASH="PASTE_REVIEWED_APPROVAL_HASH"
+ros2 launch simba_bringup coverage.launch.py \
+  config_dir:="$HOME/SIMBA/src/simba_bringup/config" \
+  map:="$MAP" output_dir:="$OUTPUT_ROOT" approved_hash:="$APPROVED_HASH"
+```
+
+PC terminal:
+
+```bash
+source /opt/ros/jazzy/setup.bash && source "$SIMBA_ROOT/install/setup.bash"
+ros2 launch simba_bringup rviz.launch.py mode:=coverage
+```
+
+Set the initial pose in RViz, wait for stable AMCL/scan matching, then explicitly preview and start:
+
+```bash
 ros2 service call /coverage/preview std_srvs/srv/Trigger '{}'
 ros2 service call /coverage/start std_srvs/srv/Trigger '{}'
 ros2 service call /coverage/pause std_srvs/srv/Trigger '{}'
 ros2 service call /coverage/resume std_srvs/srv/Trigger '{}'
 ros2 service call /coverage/cancel std_srvs/srv/Trigger '{}'
+ros2 service call /safety/reset std_srvs/srv/Trigger '{}'
 ```
 
-Connections may use safe known floor outside the selected region. Trigger services
-`calibrate_docked`, `calibrate_dock_body`, `calibrate_staging` record the actual docked
-pose, explicitly selected dock-body polygon, and a stationary, undocked staging pose
-with the dock visible. Recalibration invalidates approval; explicit `return_to_dock`
-must succeed before full coverage start. Metadata is separate `dock_<map hash>.yaml`;
-the map origin is not the dock and new maps need calibration.
+Pause publishes a zero then silence. Resume keeps blacklist and temporary-blockage state within the same task generation; only a new task generation clears it. Manual input cannot preempt coverage until coverage is paused/cancelled and manual ownership is granted. The gate times out stale Nav/remote input after 0.5 s. Native Dock/Undock receives exclusive `NATIVE` ownership and no external zero stream. Serious hazards and disabled wheels latch; reset and resume are separate actions. `BUMP` preserves the native reflex and never triggers a blind software reverse.
 
-The Pi runs supervisor, meter and safety gate. PC loss does not interrupt autonomy;
-manual commands time out and no new PC commands arrive until reconnection. Controller
-output is `/cmd_vel_nav`, manual input `/cmd_vel_remote`; only the gate publishes
-`/cmd_vel`. Pause retains the task ID, blacklist, temporary blocks and deadline.
-Restart does **not** resume. After a serious fault, remove the cause, call
-`/safety/reset` (Trigger), then explicitly resume; reset is not resume.
+The 1800 s mission watchdog covers boundary, main sweep, and up to three resweeps independently of battery thresholds. It stops, reports residual area, and does not retry. Per-target, planning, and return limits remain 60 s, 5 s, and 120 s. Completion is checked only after boundary, complete main sweep, and each complete resweep round.
 
-Runtime trust is checked at 10 Hz: position sigma <=0.10 m, yaw sigma <=10 degrees,
->=60 laser endpoints with >=65% within 0.15 m of a known obstacle, fresh scan/odom/TF,
-and AMCL age <=2 s. Two stable seconds are required. Failure stops motion and
-measurement; only trusted actual poses paint coverage, never accepted goals.
+### Dock and Undock
 
-Timeouts: mission 1800 s (including pauses/planning/resweeps), target 60 s, planning
-5 s, return 120 s, plus independent no-progress checks. Overall timeout stops and
-reports residual area without automatic retry/return. Battery: start >=30%, return
-<=25%, critical stop <=15%, freshness 15 s. Native Dock/Undock use silent ownership
-handoff; cancellations require acknowledgement.
-
-Preserve `backup_only`, enabled native bump reflexes and the selected periodic hazard
-publication (100 ms); this software does not write robot settings. Verify live values
-in the robot web UI, Application -> Configuration. BUMP/BACKUP_LIMIT are not
-CLIFF/STALL/WHEEL_DROP; never fight bump reflexes with blind reversing. `/stop_status`
-means motionless, not emergency stop; disabled wheels are a separate condition.
-
-TODO: real Nav2 validation; return-to-staging and native docking validation; charging
-confirmation; persistent checkpoints; charge/undock/relocalize/resume states. Current
-low-battery return ends the task. No automatic charge-and-resume or restart resume
-exists. Details and acceptance criteria: [development.md](docs/development.md).
-
-## Diagnostics and physical checks
-
-Before motion verify operator stop access, payload clearance, no stairs/drops,
-unchanged dock position, stable USB and power. Use a proper Pi 5 supply; never connect
-raw robot battery voltage to Pi 5 V pins. Confirm the robot USB/BLE switch is set to
-USB. Firmware I.0.0 CycloneDDS is historical: verify the installed firmware in the web
-UI, not from this README. Robot link: Pi eth0 `192.168.186.3/24` to robot `192.168.186.2`.
-
-LiDAR: A2M8, 115200 baud, stable path
-`/dev/serial/by-id/usb-Silicon_Labs_CP2102_USB_to_UART_Bridge_Controller_0001-if00-port0`.
-TF is `map -> odom -> base_footprint -> laser`; LiDAR z=0.0994 m, yaw=pi, inverted=false,
-angle compensation enabled. Recheck payload/TF/timestamps; do not invent a base_link
-mount. Typical prior scans were 14–15 Hz. Low, thin, glass or overhanging objects may
-not be visible at this scan height. Never run two map->odom publishers.
-
-<details>
-<summary>System, network, ROS and USB checks</summary>
+The PC needs `ros-jazzy-irobot-create-msgs` even when it only sends actions. Set the Create 3 namespace exactly as shown by `ros2 action list`; for the default root namespace:
 
 ```bash
-cat /etc/os-release
-uname -m
-dpkg --print-architecture
-hostname
-whoami
-hostname -I
-ip -br addr
-ip -br link
-ip route
-ip route get 192.168.186.2
-ping -c 4 create3-pi.local
-ping -c 4 192.168.186.2
-curl -I http://192.168.186.2
-df -h
-free -h
-uptime
-cat /sys/class/thermal/thermal_zone0/temp  # Millidegrees Celsius on Pi
-systemctl status ssh
-sudo ss -lntp
-networkctl status eth0
-sudo netplan get
-ls -l /etc/netplan
-sudo ufw status verbose
-journalctl -p warning -b
-journalctl -f
-sudo journalctl -u ssh -b
-sudo dmesg --follow
-lsusb
-ls -l /dev/serial/by-id/
-env | grep -E 'ROS|RMW|CYCLONE'
-ros2 pkg list
-ros2 pkg executables
-apt list --installed
-ros2 interface list
-ros2 node list
-ros2 topic list -t
-ros2 topic list --no-daemon --spin-time 10
-ros2 service list -t
-ros2 action list -t
-ros2 topic info /odom -v
-ros2 topic info /cmd_vel -v
-ros2 topic hz /odom
-ros2 topic hz /scan
-ros2 topic bw /scan
-ros2 topic echo --once /odom
+export ROBOT_NS=""     # example namespaced robot: /create3_1
+ros2 action send_goal "${ROBOT_NS}/undock" irobot_create_msgs/action/Undock '{}'
+ros2 action send_goal "${ROBOT_NS}/dock" irobot_create_msgs/action/Dock '{}'
 ```
 
-Use `ros2 topic echo TOPIC` for available `/imu`, `/hazard_detection`, `/cliff_intensity`,
-`/wheel_status`, `/wheel_ticks`, `/mouse`, `/interface_buttons`, `/tf`, `/tf_static`.
-Stop continuous displays with Ctrl+C. Restart stale discovery with `ros2 daemon stop`
-and `ros2 daemon start`, then recheck the graph. Ping alone does not establish DDS or SSH
-identity. Check domain, RMW, interface routing, firmware, application restart after
-manual configuration changes and firewall when topics are missing. RViz uses
-`-r /tf:=/tf_relay -r /tf_static:=/tf_static_relay`.
+Run these only when manual/SLAM/coverage command ownership is inactive. A dock pose is not inferred from the map origin. Automatic return/dock remains hardware-dependent and must be calibrated and validated separately.
 
-If needed, deliberately enable SSH with `sudo systemctl enable --now ssh`. Configure
-networking only during maintenance: eth0's historical static address is
-192.168.186.3/24, DHCP disabled, optional=true. Back up Netplan, use `sudo netplan generate`
-and `sudo netplan try` before `sudo netplan apply`; never apply blindly over the only
-SSH connection. Check cables/adapters when the robot link fails.
+## Safety and process lifetime
 
-Use `passwd` to change the login password. Stop robot work before `sudo reboot` or
-`sudo poweroff`. Package upgrades are maintenance operations, not a troubleshooting
-autofix; review updates rather than running unattended `full-upgrade -y`.
-</details>
+The software reads the expected `backup_only` policy as a validated configuration expectation and warns on a reported mismatch; it never writes Create 3 web settings. Native reflexes remain enabled. `/stop_status` means motionless, while disabled wheels are read from `/wheel_status`. Hazard values 2/3/4 are serious; values 0/1 are not classified as cliff/stall emergencies.
 
-Local-only delivery comes first. A private GitHub repository named SIMBA will be
-created and populated only after review; no remote repository is created by these tools.
+Pressing `Ctrl-C` sends cancellation first, relinquishes leases, publishes an explicit zero burst for gate-owned motion, waits for stopped odometry or the bounded timeout, destroys nodes, and shuts down ROS last. Launch actions have bounded SIGTERM/SIGKILL escalation and no respawn. Verify no survivors with:
+
+```bash
+ros2 node list
+pgrep -af 'simba_|rplidar|slam_toolbox|nav2'
+```
+
+An SSH or PC/RViz loss does not interrupt a Pi-hosted mission because supervisor, meter, and gate all run on the Pi in `tmux`. It blocks new remote commands. Remote stop is unavailable while connectivity is lost: use the physical Create 3 stop/control, and rely on the independent mission timeout only as a bounded fallback. Reattach with `tmux attach -t simba-coverage`.
+
+The velocity gate checks fresh scan, odometry, hazard, wheel, battery, TF/localization trust, command lease, peer config hash, duplicate node names, and exactly one `/cmd_vel` publisher. On cancel, pause, conflict, or stale input it publishes explicit zero velocity before becoming silent. Create 3 command-timeout behavior must be reverified on the installed firmware before motion; software does not treat firmware timeout as its primary stopping mechanism.
+
+## Validation order
+
+1. Run static analysis/unit tests and the tracked trapezoid regression; verify all pass and any missing real-map regression reports an explicit skip.
+2. Generate the real-map preview; verify equal stripe phase, wall-cluster angles, candidate log, route safety, and legend/numeric consistency.
+3. On the stationary robot, verify versions, interfaces, fresh sensors, `map -> odom -> base_footprint -> laser`, localization trust, one `/cmd_vel` publisher, and clean `Ctrl-C` shutdown.
+4. Supervise a short navigation with pause/cancel and network-loss tests.
+5. Cover a small bounded physical area, then the full reachable map.
+6. Validate return/dock separately only after a dock pose and native ownership behavior are confirmed.
+
+Real robot behavior remains unverified until these stages are completed.
+
+## Legacy operating-guide audit
+
+The useful legacy material was retained here as updated procedures: ROS/DDS environment setup, interface verification, SSH hostname/host-key handling, LiDAR freshness checks, manual keys, SLAM/RViz startup, map save/serialization/transfer, topic and TF diagnostics, Dock/Undock action syntax, safety-setting semantics, and shutdown checks. Obsolete absolute workspaces, stale IP addresses, old 0.30/1.00 speed claims, continuous-zero relay behavior, and rsync deployment were intentionally not carried forward. The current source and this README are authoritative.

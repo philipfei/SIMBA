@@ -1,0 +1,104 @@
+/coverage_config:
+  ros__parameters:
+    planning:
+      stripe_spacing_m: 0.35
+      min_trim_segment_length_m: 0.35
+      area_tie_tolerance_ratio: 0.001
+      max_segment_length_m: 2.0
+      stationary_target_length_m: 0.01
+      alignment: auto
+      manual_angle_deg: 0.0
+      angle_search_step_deg: 0.5
+      min_wall_length_m: 1.0
+      wall_cluster_tolerance_deg: 3.0
+      min_wall_support_m: 2.0
+      min_wall_support_ratio: 0.4
+      offset_step_m: null
+    boundary:
+      enabled: true
+      scope: outer_and_obstacles
+      direction: auto
+    completion:
+      target_coverage_ratio: 0.9
+    resweep:
+      enabled: true
+      max_rounds: 3
+      minimum_gain_m2: 0.01
+      max_targets: 200
+    localization:
+      position_sigma_m: 0.1
+      heading_sigma_deg: 10.0
+      settle_s: 2.0
+      min_endpoints: 60
+      matched_ratio: 0.65
+      match_distance_m: 0.15
+      amcl_max_age_s: 2.0
+      jump_translation_m: 0.1
+      jump_rotation_deg: 10.0
+      min_scan_range_m: 0.2
+      max_scan_range_m: 12.0
+      max_endpoints: 240
+      tf_delay_s: 0.1
+      pose_rate_hz: 10.0
+      tf_cache_s: 10.0
+      nomotion_update_period_s: 1.0
+    health:
+      scan_age_s: 0.5
+      odom_age_s: 0.5
+      hazard_age_s: 0.5
+      wheel_age_s: 2.0
+      dock_age_s: 2.0
+      battery_age_s: 15.0
+      command_age_s: 0.5
+      lease_age_s: 0.5
+      gate_age_s: 0.5
+      meter_age_s: 2.0
+      stop_linear_m_s: 0.015
+      stop_angular_rad_s: 0.03
+      stop_burst_s: 0.15
+      gate_rate_hz: 20.0
+      graph_period_s: 0.5
+      reset_grace_s: 2.0
+      future_stamp_tolerance_s: 0.1
+      shutdown_stop_messages: 3
+      stop_confirm_timeout_s: 1.0
+    measurement:
+      max_sample_gap_s: 0.3
+      translation_slack_m: 0.05
+      rotation_slack_deg: 5.0
+      publish_period_s: 0.5
+    battery:
+      start_ratio: 0.3
+      return_ratio: 0.25
+      critical_ratio: 0.15
+    deadlines:
+      mission_s: 1800.0
+      planning_s: 5.0
+      target_s: 60.0
+      return_s: 120.0
+      undock_s: 60.0
+      dock_s: 90.0
+      action_accept_s: 5.0
+      action_cancel_s: 2.0
+      no_motion_s: 15.0
+      no_coverage_gain_s: 120.0
+      prepare_s: 15.0
+      dock_confirmation_s: 2.0
+      native_ownership_s: 5.0
+      dock_visibility_s: 5.0
+      dwell_s: 0.7
+    recovery:
+      target_attempts: 2
+      blockage_radius_m: 0.25
+      bump_repeat_radius_m: 0.3
+      bump_max_s: 5.0
+      bump_clear_s: 1.0
+      endpoint_tolerance_m: 0.1
+      plan_endpoint_tolerance_m: 0.05
+      short_test_max_m: 2.0
+      planner_start_tolerance_m: 0.15
+      movement_translation_m: 0.03
+      movement_rotation_rad: 0.05
+      bump_max_repeats: 1
+    visualization:
+      period_s: 0.5

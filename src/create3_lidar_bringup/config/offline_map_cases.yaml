@@ -1,9 +1,0 @@
-# Versioned offline fixture registry. Never infer a start for unregistered maps.
-# Keys are normalized occupancy-grid geometry/content identities.
-959d0aa3106ef4db4a823949dde3ff1899e08a2dc1bc31b41c04c43d1dd7a7f8:
-  frame: map
-  start_xy_m:
-  - 0.807
-  - -1.575
-  region: whole_map
-  description: 'room_20260923_1338: recorded illustrative start, not a localized pose'

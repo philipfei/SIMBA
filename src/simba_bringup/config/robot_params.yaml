@@ -1,0 +1,24 @@
+/simba_defaults:
+  ros__parameters:
+    geometry:
+      body_radius_m: 0.18
+      planning_padding_m: 0.02
+      coverage_disk_radius_m: 0.25
+    motion:
+      linear_m_s: 0.12
+      angular_rad_s: 0.4
+      linear_accel_m_s2: 0.15
+      angular_accel_rad_s2: 0.6
+      manual_forward_m_s: 0.25
+      manual_reverse_m_s: 0.15
+      manual_angular_rad_s: 0.5
+    runtime:
+      map_frame: map
+      odom_frame: odom
+      base_frame: base_footprint
+      map_yaml: ''
+      output_dir: output
+      dock_file: ''
+    create3:
+      expected_safety_override: backup_only
+      mismatch_policy: warn
