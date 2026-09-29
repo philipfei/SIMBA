@@ -180,11 +180,14 @@ ros2 topic echo /hazard_detection --once --full-length
 ros2 topic echo /wheel_status --once --full-length
 ```
 
-Only after hazards are clear and the robot is stopped:
+If `wheel_status.wheels_enabled` is `false` after Undock, run the following on the Pi only after hazards are clear and the robot is stopped. Releasing E-Stop enables motor power but does not command motion. Then clear the SIMBA latch:
 
 ```bash
+ros2 service call /e_stop irobot_create_msgs/srv/EStop '{e_stop_on: false}'
 ros2 service call /safety/reset std_srvs/srv/Trigger '{}'
 ```
+
+Run `keyboard_teleop` again. A rejected ownership request now reports the exact blocker, such as `WHEELS_DISABLED`, `SCAN_STALE`, or a `/cmd_vel` ownership conflict.
 
 ## SLAM with RViz and teleoperation
 

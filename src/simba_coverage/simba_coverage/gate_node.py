@@ -59,8 +59,12 @@ class SafetyGate(Node):
         if self.mapping and self.policy.owner=='MANUAL':self.policy.lease_time=self.last_manual_heartbeat
 
     def manual(self,req,res):
-        if req.data and (self.inputs.reason() or not self.graph_ok or self.policy.fault):
-            res.success=False;res.message='Health/graph/reset check required';return res
+        health_reason=self.inputs.reason()
+        if req.data and (health_reason or not self.graph_ok or self.policy.fault):
+            blockers=[]
+            for blocker in (health_reason, self.graph_reason if not self.graph_ok else '', self.policy.fault):
+                if blocker and blocker not in blockers: blockers.append(blocker)
+            res.success=False;res.message='Manual ownership denied: '+','.join(blockers);return res
         now=time.monotonic();self.policy.lease('MANUAL' if req.data else 'NONE',str(now),now)
         if req.data:self.last_manual_heartbeat=now
         res.success=True;res.message='Manual ownership changed; fresh commands required';return res
