@@ -1,7 +1,9 @@
 """Export a plan as Nav2 waypoints (YAML or JSON)."""
 import datetime
+import hashlib
 import json
 import math
+import os
 
 import numpy as np
 import yaml
@@ -63,10 +65,22 @@ def _plain(v):
     return v
 
 
+def map_image_sha256(map_path):
+    """Fingerprint of the map image, so the robot can refuse a plan made on another map."""
+    try:
+        with open(map_path) as f:
+            image = yaml.safe_load(f)['image']
+        with open(os.path.join(os.path.dirname(os.path.abspath(map_path)), image), 'rb') as f:
+            return hashlib.sha256(f.read()).hexdigest()
+    except (OSError, KeyError, TypeError, yaml.YAMLError):
+        return None
+
+
 def build(result, map_path, settings):
     return {
         'frame_id': 'map',
         'map': map_path,
+        'map_image_sha256': map_image_sha256(map_path),
         'created': datetime.datetime.now().isoformat(timespec='seconds'),
         'start': [round(v, 4) for v in result['start']],
         'area_polygon': [[round(float(x), 4), round(float(y), 4)] for x, y in (result['polygon'] or [])],

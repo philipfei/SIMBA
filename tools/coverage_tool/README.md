@@ -156,9 +156,11 @@ If the coverage radius equals the robot radius, the thin strip against the walls
 
 ## Export format
 
-The YAML/JSON file contains `poses`: the whole driven path in order, transit included. There is a pose at every vertex of the planned path and at least every 0.5 m. This makes Nav2 follow the planned shape instead of planning its own shortcut between far-apart goals. Each pose has `x`, `y`, `yaw`, a quaternion and a `kind` (wall, lane, spiral, fill, gap, transit). `segments` holds the planned pieces, and `stats` and `settings` are included for reference.
+The YAML/JSON file contains `poses`: the whole driven path in order, transit included. There is a pose at every vertex of the planned path and at least every 0.5 m. This makes Nav2 follow the planned shape instead of planning its own shortcut between far-apart goals. Each pose has `x`, `y`, `yaw`, a quaternion and a `kind` (wall, lane, spiral, fill, gap, transit). `segments` holds the planned pieces, and `stats` and `settings` are included for reference. `map_image_sha256` fingerprints the map image, so the robot can refuse a plan made on a different map.
 
-`send_to_nav2.py` sends the poses with **NavigateThroughPoses**: the robot drives through them without stopping. Use `--waypoints` for FollowWaypoints (the robot stops at every pose, so it is much slower). `--set-initial-pose` also tells AMCL that the robot is at the plan start. This script has not been tested on a robot yet.
+**On the SIMBA robot**, run the plan with `coverage.launch.py plan:=FILE`; see *Drive an exported coverage_tool plan* in the repository README. Plan with **robot radius 0.23 m or more**: SIMBA refuses a path that comes within 0.20 m of a wall, and this tool's per-cell clearance check is up to half a cell more lenient than SIMBA's exact one.
+
+`send_to_nav2.py` is for a plain Nav2 stack only. It does not work with SIMBA's coverage launch, which runs no `bt_navigator` and only passes velocity commands from its own supervisor. It sends the poses with **NavigateThroughPoses**: the robot drives through them without stopping. Use `--waypoints` for FollowWaypoints (the robot stops at every pose, so it is much slower). `--set-initial-pose` also tells AMCL that the robot is at the plan start. This script has not been tested on a robot yet.
 
 ## Command line
 

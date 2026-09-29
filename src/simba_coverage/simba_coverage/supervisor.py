@@ -25,6 +25,7 @@ from .state import Mission
 from .params import node_settings, approval_manifest, canonical_hash
 from .planning import optimize, boundary_routes, connect, points_of, split_path, trim_stripes, length
 from .health import Trust
+from .plan_file import load_plan
 from .ros_common import (Inputs, ActionSlot, LATCHED, LATEST, parameter, decode, json_msg,
                          diagnostic, pose_msg, path_msg, pose3, transform3, yaw, ros_now, stamp_seconds)
 
@@ -37,6 +38,8 @@ class Supervisor(Node):
         super().__init__('coverage_supervisor')
         self.settings=node_settings(self);cfg=self.settings
         self.approved_hash=self.declare_parameter('approved_hash','').value
+        # A reviewed coverage_tool export replaces on-robot planning and approval.
+        self.plan_file=self.declare_parameter('plan_file','').value
         self.map_frame=cfg['runtime']['map_frame'];self.odom_frame=cfg['runtime']['odom_frame'];self.base_frame=cfg['runtime']['base_frame']
         self.base=Grid.load(cfg['runtime']['map_yaml']);self.grid=self.base
         h,w=self.base.cells.shape
@@ -186,7 +189,7 @@ class Supervisor(Node):
         self.idle_for_edit()
         if not self.trusted:raise ValueError('Localize first, or use the separate offline preview tool')
         start=self.pose[:2]
-        if self.is_docked():self.check_dock(False);start=self.dock['staging'][:2]
+        if self.is_docked() and (not self.plan_file or self.dock.get('staging')):self.check_dock(False);start=self.dock['staging'][:2]
         self.grid=self.make_grid();grid=self.grid;polygon=list(self.region)
         self.preview=None
         def build():
@@ -202,13 +205,41 @@ class Supervisor(Node):
                     'stripes':plan['targets'],'boundary':boundary,'boundary_audit':audit,'candidates':plan['candidates'],
                     'selected':plan['selected'],'walls':plan['walls'],'config_hash':self.settings.hash,
                     'approval_manifest':manifest,'approval_hash':manifest['approval_hash']}
+        if self.plan_file:build=lambda:self.plan_preview(grid,start,polygon)
         self.work=self.worker_pool.submit(build);self.work_kind='preview';self.work_key=None
         return 'Preview calculation queued; inspect /coverage/status and route before start'
 
+    def plan_preview(self,grid,start,polygon):
+        plan=load_plan(self.plan_file,grid,self.settings['runtime']['map_yaml'],self.map_frame,self.collision,
+                       self.settings['planning']['max_segment_length_m'])
+        reachable=grid.reachable(start,self.collision,self.settings['recovery']['planner_start_tolerance_m'])
+        first=grid.cell(plan['points'][0])
+        if not grid.valid(first) or not reachable[first]:raise ValueError('PLAN_START_UNREACHABLE from the robot position')
+        return {'reachable':reachable,'denominator':grid.coverable(reachable,polygon,self.radius),'targets':plan['targets'],
+                'connections':[[] for _ in plan['targets']],'start':start,'stripes':[],'boundary':[],
+                'config_hash':self.settings.hash,'plan_file':str(self.plan_file),'plan_sha256':plan['plan_sha256']}
+
     def start(self):
-        self.ready(require_dock=True)
+        self.ready(require_dock=not self.plan_file)
         if self.preview is None or self.work is not None:raise ValueError('A completed preview is required')
         if self.preview.get('config_hash')!=self.settings.hash:raise ValueError('PREVIEW_CONFIG_STALE: regenerate preview')
+        if not self.plan_file:self.check_approval()
+        if not self.config_ready():raise ValueError('CONFIG_HASH_MISMATCH')
+        if self.inputs.messages['battery_state'].percentage<self.settings['battery']['start_ratio']:raise ValueError(f"Start requires battery >= {100*self.settings['battery']['start_ratio']:g}%")
+        if not self.inputs.fresh('dock_status',self.settings['health']['dock_age_s']):raise ValueError('DOCK_STATUS_STALE')
+        if not self.is_docked():self.check_start_component()
+        self.mission.start(time.monotonic(),self.timeout)
+        self.definition={'generation':self.mission.generation,'map_id':self.base.identity,
+                         'config_hash':self.settings.hash,'denominator':np.flatnonzero(self.preview['denominator']).tolist(),'keepout':self.keepout}
+        self.definition_pub.publish(json_msg(self.definition));self.measurement={};self.meter_time=0.
+        self.coverage_phase='PLAN' if self.plan_file else 'BOUNDARY' if self.settings['boundary']['enabled'] else 'MAIN'
+        self.phase_checks=[];self.trim_residual=[]
+        self.targets=list(self.preview.get('boundary',[])) if self.coverage_phase=='BOUNDARY' else list(self.preview['targets']);self.current=None;self.pending_phase='UNDOCK' if self.is_docked() else 'NEXT'
+        self.phase_since=time.monotonic();self.round_start_area=0.;self.gain_area=0.;self.no_gain=0.
+        self.bump_locations=[];self.manual=False
+        return 'Task accepted; preparation checks precede motion'
+
+    def check_approval(self):
         if not self.approved_hash:raise ValueError('APPROVED_HASH_REQUIRED: pass approved_hash to coverage.launch.py')
         approved_file=self.output/'approvals'/(self.approved_hash+'.json')
         if not approved_file.is_file():raise ValueError('APPROVAL_MANIFEST_MISSING: copy the reviewed manifest to '+str(approved_file))
@@ -220,20 +251,6 @@ class Supervisor(Node):
             keys=sorted(set(approved.get('components',{}))|set(runtime.get('components',{})))
             details={k:{'preview':approved.get('components',{}).get(k),'runtime':runtime.get('components',{}).get(k)} for k in keys}
             raise ValueError('APPROVAL_HASH_MISMATCH '+json.dumps(details,sort_keys=True))
-        if not self.config_ready():raise ValueError('CONFIG_HASH_MISMATCH')
-        if self.inputs.messages['battery_state'].percentage<self.settings['battery']['start_ratio']:raise ValueError(f"Start requires battery >= {100*self.settings['battery']['start_ratio']:g}%")
-        if not self.inputs.fresh('dock_status',self.settings['health']['dock_age_s']):raise ValueError('DOCK_STATUS_STALE')
-        if not self.is_docked():self.check_start_component()
-        self.mission.start(time.monotonic(),self.timeout)
-        self.definition={'generation':self.mission.generation,'map_id':self.base.identity,
-                         'config_hash':self.settings.hash,'denominator':np.flatnonzero(self.preview['denominator']).tolist(),'keepout':self.keepout}
-        self.definition_pub.publish(json_msg(self.definition));self.measurement={};self.meter_time=0.
-        self.coverage_phase='BOUNDARY' if self.settings['boundary']['enabled'] else 'MAIN'
-        self.phase_checks=[];self.trim_residual=[]
-        self.targets=list(self.preview.get('boundary',[])) if self.coverage_phase=='BOUNDARY' else list(self.preview['targets']);self.current=None;self.pending_phase='UNDOCK' if self.is_docked() else 'NEXT'
-        self.phase_since=time.monotonic();self.round_start_area=0.;self.gain_area=0.;self.no_gain=0.
-        self.bump_locations=[];self.manual=False
-        return 'Task accepted; preparation checks precede motion'
 
     def check_start_component(self):
         try:
@@ -386,6 +403,7 @@ class Supervisor(Node):
         remaining=self.preview['denominator'].copy();remaining.ravel()[self.measurement.get('covered_indices',[])]=False
         self.phase_checks.append({'phase':self.coverage_phase,'round':self.mission.rounds,'fraction':fraction,'sample_seq':self.measurement.get('sample_seq',0)})
         self.work_previous_phase=self.coverage_phase;self.work_previous_round=self.mission.rounds;self.work_previous_round_area=self.round_start_area
+        if self.coverage_phase=='PLAN':self.complete_coverage('PLAN_COMPLETE');return
         if self.coverage_phase=='BOUNDARY':
             self.coverage_phase='MAIN';self.mission.state='GAP_PLANNING'
             def build_main():return trim_stripes(self.grid,self.preview['stripes'],remaining,self.settings)
@@ -410,9 +428,13 @@ class Supervisor(Node):
         self.work_key=(self.mission.generation,self.mission.token);self.phase_since=time.monotonic()
 
     def complete_coverage(self,reason):
-        self.mission.coverage_finished=True;self.mission.reason=reason;self.save_report();self.begin_return()
+        self.mission.coverage_finished=True;self.mission.reason=reason
+        # Plan mode does not require a dock calibration; without one the robot stops where the plan ends.
+        if self.plan_file and not self.dock.get('validated'):self.mission.change('FINISHED',reason,time.monotonic());self.save_report();return
+        self.save_report();self.begin_return()
 
     def begin_return(self):
+        if not self.dock.get('staging'):raise ValueError('NO_DOCK_CALIBRATION: cannot return to dock')
         self.return_since=time.monotonic();self.plan_to(self.dock['staging'][:2],'RETURN_PLAN',self.dock['staging'][2])
 
     def fail(self,reason):
@@ -437,6 +459,7 @@ class Supervisor(Node):
            'coverage_threshold_met':self.measurement.get('fraction',0.)>=self.settings['completion']['target_coverage_ratio'],
            'coverage_phase':self.coverage_phase,'phase_checks':self.phase_checks,'trim_residual':self.trim_residual,
            'config_hash':self.settings.hash,'effective_config':self.settings.values}
+        if self.preview and self.preview.get('plan_file'):d['plan_file']=self.preview['plan_file'];d['plan_sha256']=self.preview['plan_sha256']
         if self.preview:
             roi=self.base.polygon_mask(self.region)&self.base.free
             d['selected_free_m2']=int(roi.sum())*self.base.resolution**2
@@ -492,7 +515,7 @@ class Supervisor(Node):
                 if kind=='preview':
                     self.preview=result;self.mission.reason='PREVIEW_READY'
                     self.output.mkdir(parents=True,exist_ok=True)
-                    audit={k:result[k] for k in ('candidates','selected','walls','boundary_audit','config_hash','start')}
+                    audit={k:result[k] for k in ('candidates','selected','walls','boundary_audit','config_hash','start','plan_file','plan_sha256') if k in result}
                     audit['effective_config']=self.settings.values
                     (self.output/'preview_audit.json').write_text(json.dumps(audit,indent=2)+'\n')
                 elif key==(self.mission.generation,self.mission.token) and self.mission.state=='GAP_PLANNING':

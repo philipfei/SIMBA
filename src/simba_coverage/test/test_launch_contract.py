@@ -25,6 +25,8 @@ def test_coverage_launch_has_exact_nav2_process_contract_and_remap():
     }
     assert all(token in text for token in expected)
     assert "CONTROLLER_REMAPS = [('cmd_vel', '/cmd_vel_nav'), ('/cmd_vel', '/cmd_vel_nav')]" in text
+    # An exported plan is executed by the supervisor, not handed to a separate navigator.
+    assert "'plan_file'" in text and text.count("'plan_file'")==1
     for forbidden in ('bt_navigator', 'waypoint_follower', 'smoother_server',
                       'velocity_smoother', 'behavior_server', 'collision_monitor'):
         assert forbidden not in text

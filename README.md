@@ -270,6 +270,36 @@ ros2 service call /coverage/cancel std_srvs/srv/Trigger '{}'
 
 The gate is the sole `/cmd_vel` publisher. Nav2 publishes `/cmd_vel_nav`; teleop publishes `/cmd_vel_remote`. Pause/cancel sends zero before silence. The 1800 s mission watchdog stops and reports residual area without automatic retry.
 
+## Drive an exported coverage_tool plan
+
+`tools/coverage_tool` plans a path on the PC and exports it as a `.yaml` file. Launching coverage with `plan:=` makes the supervisor drive that path instead of planning on the robot. Nav2, the velocity gate, localization trust, bump handling, battery and deadline checks work exactly as in fixed-map coverage. No `approved_hash` is needed: the plan file passed at launch is the approval.
+
+The plan must be made on the same map that the Pi loads, with **robot radius at least 0.23 m** in coverage_tool. The supervisor refuses a plan that comes within 0.20 m (`body_radius_m` + `planning_padding_m`) of a wall or unknown cell, and a plan whose `map_image_sha256` does not match the loaded map image. The tool checks clearance per grid cell, so 0.20 m in the tool is not enough.
+
+The tracked plan `tools/coverage_tool/examples/map_ME_room1v4_coveragev3.yaml` was made this way for `map_ME_room1v4.yaml`. It starts at x=-0.04, y=1.23.
+
+Update and build the Pi first (see *Git deployment to the Pi*, using this branch if it is not merged into `main` yet). Then, in a Pi terminal inside tmux:
+
+```bash
+tmux new -s simba-plan
+source /opt/ros/jazzy/setup.bash
+source /home/create3-pi/SIMBA/.env.local
+source /home/create3-pi/SIMBA/install/setup.bash
+ros2 launch simba_bringup coverage.launch.py config_dir:=/home/create3-pi/SIMBA/src/simba_bringup/config map:=/home/create3-pi/SIMBA/tools/coverage_tool/examples/map_ME_room1v4.yaml plan:=/home/create3-pi/SIMBA/tools/coverage_tool/examples/map_ME_room1v4_coveragev3.yaml output_dir:=/home/create3-pi/SIMBA/output
+```
+
+Place the robot undocked, anywhere in the room. It does not have to be at the plan start: the supervisor first drives to it. Start RViz on the PC with `mode:=coverage`, set the initial pose, and wait until `/coverage/state` reports `"trusted": true`. Then:
+
+```bash
+ros2 service call /coverage/preview std_srvs/srv/Trigger '{}'
+ros2 topic echo /coverage/state --once --full-length
+ros2 service call /coverage/start std_srvs/srv/Trigger '{}'
+```
+
+Check that `preview_ready` is `true` before calling start. If it is `false`, the `reason` field names the problem (for example `PLAN_TOO_CLOSE_TO_OBSTACLES` or `PLAN_MAP_MISMATCH`). RViz shows the loaded plan on `/coverage/route`. `pause`, `resume` and `cancel` work as in fixed-map coverage.
+
+When the last pose is reached, the task finishes with reason `PLAN_COMPLETE`. If a validated dock calibration exists, the robot then returns and docks; otherwise it stops where the plan ends. Low battery without a dock calibration pauses the task. The coverage percentage reported by the meter uses SIMBA's 0.25 m coverage disk, so it can be lower than the tool's estimate; it does not decide when the plan ends. The task report in `output_dir` records `plan_file` and `plan_sha256`.
+
 ## Dock and Undock
 
 The PC requires `ros-jazzy-irobot-create-msgs`. Run these only when manual/SLAM/coverage command ownership is inactive:

@@ -288,3 +288,36 @@ def test_new_meter_generation_discards_previous_phase_acknowledgement(ros):
     meter.definition(json_msg({'generation':'new','config_hash':meter.settings.hash,'map_id':meter.base.identity,
                                'denominator':np.flatnonzero(meter.base.free).tolist(),'keepout':[]}))
     assert meter.generation=='new' and meter.last_active_sample_seq==0 and meter.sample_seq==0
+
+
+def test_exported_plan_is_driven_in_order_and_finishes_without_dock(ros):
+    import yaml
+    add,pump,_,tmp_path=ros
+    points=[[2.,2.],[2.6,2.],[2.6,2.6],[2.,2.6]]
+    plan=tmp_path/'plan.yaml'
+    plan.write_text(yaml.safe_dump({'frame_id':'map','poses':[{'x':x,'y':y,'orientation':{'z':0.,'w':1.}} for x,y in points]}))
+    gate=add(SafetyGate());sup=add(Supervisor());meter=add(CoverageMeter());fake=add(FakeInputs())
+    fake.request_owner=None;fake.publish_trust=False;fake.publish_map(sup.base);sup.plan_file=str(plan)
+    driven=[]
+    def planner(handle):
+        result=ComputePathToPose.Result();result.path=path_msg(fake,[[fake.x,fake.y],[handle.request.goal.pose.position.x,handle.request.goal.pose.position.y]])
+        handle.succeed();return result
+    def follow(handle):
+        driven.append((gate.policy.owner,[[p.pose.position.x,p.pose.position.y] for p in handle.request.path.poses]))
+        end=handle.request.path.poses[-1].pose.position
+        fake.x,fake.y=end.x,end.y;time.sleep(.4);handle.succeed();return FollowPath.Result()
+    servers=[ActionServer(fake,ComputePathToPose,'/compute_path_to_pose',execute_callback=planner,callback_group=ReentrantCallbackGroup()),
+             ActionServer(fake,FollowPath,'/follow_path',execute_callback=follow,callback_group=ReentrantCallbackGroup())]
+    end=time.monotonic()+15.
+    while not (sup.trusted and sup.config_ready()) and time.monotonic()<end:pump(.2)
+    assert sup.trusted,sup.trust.reason
+    # Built synchronously: the GIL-bound worker is starved by this test's tight executor loop.
+    sup.grid=sup.make_grid();sup.preview=sup.plan_preview(sup.grid,sup.pose[:2],sup.region)
+    sup.start();pump(12.)
+    assert sup.mission.state=='FINISHED' and sup.mission.reason=='PLAN_COMPLETE',(sup.mission.state,sup.mission.reason,sup.mission.events)
+    assert all(owner=='NAV' for owner,_ in driven)
+    route=[xy for _,path in driven for xy in path]
+    hits=[min(i for i,xy in enumerate(route) if math.dist(corner,xy)<1e-3) for corner in points[1:]]
+    assert hits==sorted(hits),route
+    assert json.loads((sup.output/('task_'+sup.mission.generation+'.json')).read_text())['plan_file']==str(plan)
+    for server in servers:server.destroy()

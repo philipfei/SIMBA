@@ -64,7 +64,11 @@ Edge cells left are reported, allowed by design. Last run: 8/8 pass, 0 cells mis
 ## Status / next steps
 
 - Only tested on synthetic maps in `examples/` — **not yet on the real map or robot.** First task: run on the real map.
-- `send_to_nav2.py` (FollowWaypoints / NavigateThroughPoses via nav2_simple_commander) is untested. Before trusting it:
+- On the SIMBA robot the export is driven by `coverage.launch.py plan:=FILE` (the Pi's coverage_supervisor loads it,
+  `src/simba_coverage/simba_coverage/plan_file.py`). SIMBA refuses plans closer than 0.20 m to walls with an exact
+  capsule check, so plan with robot radius >= 0.23 m. `map_image_sha256` in the export lets the robot reject plans
+  made on another map. `examples/map_ME_room1v4_coveragev3.yaml` is the 0.23 m plan for the real room map.
+- `send_to_nav2.py` only fits a plain Nav2 stack (SIMBA runs no bt_navigator). Untested. Before trusting it:
   same map in Nav2 as in the planner, set initial pose (`nav.setInitialPose`), match Nav2 `robot_radius`/inflation
   to the planner's robot radius, check goal tolerances vs waypoint spacing, consistent `use_sim_time`.
 - Calibrate `stop_penalty_s`, `bend_s_per_rad`, `angular_rad_s` from real Create3 logs.

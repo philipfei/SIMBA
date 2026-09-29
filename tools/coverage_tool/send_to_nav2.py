@@ -1,5 +1,8 @@
 """Send an exported coverage plan to a running Nav2 stack (ROS 2).
 
+For a plain Nav2 stack with bt_navigator. On the SIMBA robot use coverage.launch.py plan:=FILE
+instead (see the repository README).
+
 Run on the robot / ROS 2 machine (needs nav2_simple_commander, not the other deps):
     python3 send_to_nav2.py office_coverage.yaml               # NavigateThroughPoses (drives through, no stops)
     python3 send_to_nav2.py office_coverage.yaml --waypoints   # FollowWaypoints (stops at every pose)

@@ -1,0 +1,1354 @@
+frame_id: map
+map: examples/map_ME_room1v4.yaml
+map_image_sha256: c2630cb1c1f60038c21bde62c76103a3ffc8df23effceb4ea6053b22c3474248
+created: '2026-09-29T14:29:09'
+start: [-0.043, 1.225]
+area_polygon: []
+stats: {pattern: 'Spiral, outer walls only', cost_total_s: 567.5794, cost_drive_s: 139.9644, cost_turn_s: 305.3441, cost_bend_s: 43.0651,
+  edge_missed_m2: 0.0, cost_reverse_s: 60.0, cost_overlap_s: 62.2708, cost_missed_s: 0.0, sharp_turns: 108, hairpins: 6, overlap_m2: 14.945,
+  missed_m2: 0.0, coverage_pct: 95.3241, coverage_of_reachable_pct: 100.0, area_m2: 17.8575, covered_m2: 17.0225, path_spacing_m: 0.72,
+  overlap_pct: 10.0, regions: 0, rings: 2, loops: 1, working_length_m: 17.5451, connector_length_m: 24.4442, total_length_m: 41.9893,
+  estimated_time_s: 445.3086, goals: 46, wall_segments: 39, spiral_segments: 0, lane_segments: 0, centre_line_segments: 3,
+  gap_goals: 4, skipped_unreachable: 0, uncovered_reachable_cells: 0, uncovered_interior_cells: 0, planning_time_s: 84.941}
+settings:
+  geometry: {robot_radius_m: 0.23, coverage_disk_radius_m: 0.4}
+  spiral: {overlap_pct: 10.0, obstacle_mode: around, wall_side: right}
+  strategy: {mode: auto, wall_loop_first: true}
+  cost: {smooth_turn_deg: 20.0, bend_s_per_rad: 1.5, stop_penalty_s: 1.0, reverse_angle_deg: 150.0, reverse_penalty_s: 10.0,
+    overlap_weight: 1.0, missed_weight: 10000.0, edge_band_m: 0.1, edge_missed_weight: 10000.0}
+  planning: {max_segment_length_m: 2.0}
+  motion: {linear_m_s: 0.3, angular_rad_s: 0.8}
+  optimizer: {search_time_s: 4.0, polish_time_s: 15.0, neighbours: 8}
+poses:
+- x: -0.043
+  y: 1.225
+  yaw: -1.92957
+  orientation: {z: -0.821926, w: 0.569595}
+  kind: transit
+- x: -0.193
+  y: 0.825
+  yaw: -1.92957
+  orientation: {z: -0.821926, w: 0.569595}
+  kind: transit
+- x: -0.2435
+  y: 0.825
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: -0.193
+  y: 0.7745
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.043
+  y: 0.625
+  yaw: -0.78373
+  orientation: {z: -0.381914, w: 0.924198}
+  kind: transit
+- x: -0.043
+  y: 0.425
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: transit
+- x: -0.193
+  y: 0.2755
+  yaw: -2.35786
+  orientation: {z: -0.924198, w: 0.381914}
+  kind: transit
+- x: -0.2483
+  y: 0.2479
+  yaw: -2.67795
+  orientation: {z: -0.973249, w: 0.229753}
+  kind: wall
+- x: -0.443
+  y: 0.225
+  yaw: -3.02473
+  orientation: {z: -0.998293, w: 0.058398}
+  kind: transit
+- x: -0.643
+  y: 0.325
+  yaw: 2.67795
+  orientation: {z: 0.973249, w: 0.229753}
+  kind: transit
+- x: -0.6425
+  y: 0.375
+  yaw: 1.56082
+  orientation: {z: 0.70357, w: 0.710626}
+  kind: transit
+- x: -0.6435
+  y: 0.425
+  yaw: 1.59075
+  orientation: {z: 0.714127, w: 0.700016}
+  kind: wall
+- x: -0.6435
+  y: 0.175
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.5935
+  y: 0.125
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.5935
+  y: -0.225
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.5435
+  y: -0.275
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.5435
+  y: -0.625
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.4935
+  y: -0.675
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.4935
+  y: -0.975
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.4435
+  y: -1.025
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.4435
+  y: -1.2854
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.4435
+  y: -1.475
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.3935
+  y: -1.525
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.3935
+  y: -1.925
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.3435
+  y: -1.975
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.3435
+  y: -2.25
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.3435
+  y: -2.525
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.2935
+  y: -2.575
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.2935
+  y: -2.775
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.243
+  y: -2.7255
+  yaw: 0.77542
+  orientation: {z: 0.378069, w: 0.925778}
+  kind: wall
+- x: -0.143
+  y: -2.7255
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: -0.093
+  y: -2.7755
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: -0.043
+  y: -2.7755
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 0.307
+  y: -2.7245
+  yaw: 0.14469
+  orientation: {z: 0.072282, w: 0.997384}
+  kind: transit
+- x: 0.4188
+  y: -2.7245
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 0.8629
+  y: -2.6995
+  yaw: 0.05623
+  orientation: {z: 0.028114, w: 0.999605}
+  kind: transit
+- x: 1.307
+  y: -2.6745
+  yaw: 0.05623
+  orientation: {z: 0.028114, w: 0.999605}
+  kind: transit
+- x: 1.3802
+  y: -2.6745
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 1.7186
+  y: -2.7
+  yaw: -0.07521
+  orientation: {z: -0.037598, w: 0.999293}
+  kind: transit
+- x: 2.057
+  y: -2.7255
+  yaw: -0.07521
+  orientation: {z: -0.037598, w: 0.999293}
+  kind: transit
+- x: 2.1575
+  y: -2.725
+  yaw: 0.00497
+  orientation: {z: 0.002483, w: 0.999997}
+  kind: wall
+- x: 2.1575
+  y: -2.625
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 2.107
+  y: -2.625
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: 2.1075
+  y: -2.175
+  yaw: 1.56969
+  orientation: {z: 0.706715, w: 0.707499}
+  kind: transit
+- x: 2.1075
+  y: -2.125
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 2.057
+  y: -2.1245
+  yaw: 3.13171
+  orientation: {z: 0.999988, w: 0.004941}
+  kind: wall
+- x: 2.007
+  y: -2.1745
+  yaw: -2.35619
+  orientation: {z: -0.92388, w: 0.382683}
+  kind: wall
+- x: 1.9863
+  y: -2.1745
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 1.907
+  y: -2.225
+  yaw: -2.57449
+  orientation: {z: -0.960067, w: 0.279769}
+  kind: transit
+- x: 1.807
+  y: -2.225
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: 1.757
+  y: -2.225
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: 1.757
+  y: -2.1745
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: transit
+- x: 1.707
+  y: -2.1745
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 1.757
+  y: -2.575
+  yaw: -1.44659
+  orientation: {z: -0.66186, w: 0.749627}
+  kind: transit
+- x: 1.807
+  y: -2.9755
+  yaw: -1.44659
+  orientation: {z: -0.66186, w: 0.749627}
+  kind: transit
+- x: 1.757
+  y: -2.9755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 1.4068
+  y: -2.842
+  yaw: 2.77736
+  orientation: {z: 0.983462, w: 0.181113}
+  kind: transit
+- x: 1.0567
+  y: -2.7085
+  yaw: 2.77736
+  orientation: {z: 0.983462, w: 0.181113}
+  kind: transit
+- x: 0.7065
+  y: -2.575
+  yaw: 2.77736
+  orientation: {z: 0.983462, w: 0.181113}
+  kind: transit
+- x: 0.7565
+  y: -2.475
+  yaw: 1.10715
+  orientation: {z: 0.525731, w: 0.850651}
+  kind: wall
+- x: 0.7565
+  y: -2.4511
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 0.7315
+  y: -2.188
+  yaw: 1.66556
+  orientation: {z: 0.739804, w: 0.672823}
+  kind: transit
+- x: 0.7065
+  y: -1.925
+  yaw: 1.66556
+  orientation: {z: 0.739804, w: 0.672823}
+  kind: transit
+- x: 0.7065
+  y: -1.825
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 0.6565
+  y: -1.725
+  yaw: 2.03444
+  orientation: {z: 0.850651, w: 0.525731}
+  kind: wall
+- x: 0.5565
+  y: -1.625
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall
+- x: 0.5565
+  y: -1.575
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 0.5065
+  y: -1.525
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall
+- x: 0.557
+  y: -1.5245
+  yaw: 0.00988
+  orientation: {z: 0.004941, w: 0.999988}
+  kind: wall
+- x: 0.557
+  y: -1.575
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: transit
+- x: 0.757
+  y: -1.625
+  yaw: -0.24498
+  orientation: {z: -0.122183, w: 0.992508}
+  kind: transit
+- x: 1.157
+  y: -1.625
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: transit
+- x: 1.307
+  y: -1.4745
+  yaw: 0.78706
+  orientation: {z: 0.38345, w: 0.923561}
+  kind: transit
+- x: 1.3075
+  y: -1.625
+  yaw: -1.56748
+  orientation: {z: -0.705934, w: 0.708278}
+  kind: wall
+- x: 1.2075
+  y: -1.875
+  yaw: -1.9513
+  orientation: {z: -0.828067, w: 0.560629}
+  kind: transit
+- x: 1.1075
+  y: -2.125
+  yaw: -1.9513
+  orientation: {z: -0.828067, w: 0.560629}
+  kind: transit
+- x: 1.0575
+  y: -2.225
+  yaw: -2.03444
+  orientation: {z: -0.850651, w: 0.525731}
+  kind: wall
+- x: 0.8072
+  y: -2.625
+  yaw: -2.12984
+  orientation: {z: -0.874751, w: 0.484572}
+  kind: transit
+- x: 0.557
+  y: -3.025
+  yaw: -2.12984
+  orientation: {z: -0.874751, w: 0.484572}
+  kind: transit
+- x: 0.2565
+  y: -3.325
+  yaw: -2.35703
+  orientation: {z: -0.924038, w: 0.3823}
+  kind: transit
+- x: 0.2565
+  y: -3.525
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: 0.557
+  y: -3.8255
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: transit
+- x: 0.507
+  y: -3.8255
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 0.307
+  y: -3.9755
+  yaw: -2.49809
+  orientation: {z: -0.948683, w: 0.316228}
+  kind: wall
+- x: 0.157
+  y: -4.125
+  yaw: -2.35786
+  orientation: {z: -0.924198, w: 0.381914}
+  kind: transit
+- x: 0.157
+  y: -4.325
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: transit
+- x: 0.2075
+  y: -4.325
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: transit
+- x: 0.207
+  y: -4.3755
+  yaw: -1.58068
+  orientation: {z: -0.710592, w: 0.703605}
+  kind: wall
+- x: -0.043
+  y: -4.3755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: -0.1435
+  y: -4.375
+  yaw: 3.13663
+  orientation: {z: 0.999997, w: 0.002483}
+  kind: transit
+- x: -0.1435
+  y: -3.975
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: -0.1935
+  y: -3.775
+  yaw: 1.81577
+  orientation: {z: 0.788205, w: 0.615412}
+  kind: wall
+- x: 0.007
+  y: -3.7745
+  yaw: 0.00249
+  orientation: {z: 0.001244, w: 0.999999}
+  kind: wall
+- x: 0.107
+  y: -3.7245
+  yaw: 0.46365
+  orientation: {z: 0.229753, w: 0.973249}
+  kind: wall
+- x: 0.507
+  y: -3.4748
+  yaw: 0.55815
+  orientation: {z: 0.275467, w: 0.961311}
+  kind: transit
+- x: 0.907
+  y: -3.225
+  yaw: 0.55815
+  orientation: {z: 0.275467, w: 0.961311}
+  kind: transit
+- x: 1.157
+  y: -3.375
+  yaw: -0.54042
+  orientation: {z: -0.266934, w: 0.963715}
+  kind: fill
+- x: 1.4072
+  y: -3.35
+  yaw: 0.09957
+  orientation: {z: 0.049764, w: 0.998761}
+  kind: transit
+- x: 1.6575
+  y: -3.325
+  yaw: 0.09957
+  orientation: {z: 0.049764, w: 0.998761}
+  kind: transit
+- x: 1.6575
+  y: -3.375
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: 1.7075
+  y: -3.425
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: 1.7075
+  y: -3.575
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: 1.807
+  y: -3.775
+  yaw: -1.10915
+  orientation: {z: -0.526581, w: 0.850125}
+  kind: transit
+- x: 1.957
+  y: -3.8245
+  yaw: -0.31875
+  orientation: {z: -0.158703, w: 0.987326}
+  kind: transit
+- x: 2.057
+  y: -3.8245
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 2.157
+  y: -3.7745
+  yaw: 0.46365
+  orientation: {z: 0.229753, w: 0.973249}
+  kind: wall
+- x: 2.2575
+  y: -3.675
+  yaw: 0.78041
+  orientation: {z: 0.380377, w: 0.924831}
+  kind: wall
+- x: 2.2575
+  y: -4.075
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: 2.307
+  y: -4.1255
+  yaw: -0.79538
+  orientation: {z: -0.387289, w: 0.921959}
+  kind: wall
+- x: 2.032
+  y: -4.1505
+  yaw: -3.05093
+  orientation: {z: -0.998973, w: 0.045314}
+  kind: wall
+- x: 1.757
+  y: -4.1755
+  yaw: -3.05093
+  orientation: {z: -0.998973, w: 0.045314}
+  kind: wall
+- x: 1.357
+  y: -4.175
+  yaw: 3.14035
+  orientation: {z: 1.0, w: 0.000624}
+  kind: transit
+- x: 1.257
+  y: -4.225
+  yaw: -2.67795
+  orientation: {z: -0.973249, w: 0.229753}
+  kind: transit
+- x: 1.207
+  y: -4.225
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: 1.207
+  y: -4.2755
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: transit
+- x: 1.157
+  y: -4.2755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 1.2065
+  y: -4.225
+  yaw: 0.79538
+  orientation: {z: 0.387289, w: 0.921959}
+  kind: wall
+- x: 1.2065
+  y: -4.125
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 1.1565
+  y: -4.025
+  yaw: 2.03444
+  orientation: {z: 0.850651, w: 0.525731}
+  kind: wall
+- x: 1.107
+  y: -3.925
+  yaw: 2.03044
+  orientation: {z: 0.849598, w: 0.527431}
+  kind: transit
+- x: 1.057
+  y: -3.9255
+  yaw: -3.13161
+  orientation: {z: -0.999988, w: 0.00499}
+  kind: transit
+- x: 0.757
+  y: -3.8255
+  yaw: 2.81984
+  orientation: {z: 0.987087, w: 0.160182}
+  kind: wall
+- x: 0.5405
+  y: -3.4087
+  yaw: 2.04984
+  orientation: {z: 0.854672, w: 0.519168}
+  kind: transit
+- x: 0.324
+  y: -2.9918
+  yaw: 2.04984
+  orientation: {z: 0.854672, w: 0.519168}
+  kind: transit
+- x: 0.1075
+  y: -2.575
+  yaw: 2.04984
+  orientation: {z: 0.854672, w: 0.519168}
+  kind: transit
+- x: 0.0575
+  y: -2.475
+  yaw: 2.03444
+  orientation: {z: 0.850651, w: 0.525731}
+  kind: wall
+- x: 0.0575
+  y: -2.325
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 0.1075
+  y: -2.275
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: wall
+- x: 0.007
+  y: -2.2745
+  yaw: 3.13663
+  orientation: {z: 0.999997, w: 0.002483}
+  kind: wall
+- x: -0.093
+  y: -2.2245
+  yaw: 2.67795
+  orientation: {z: 0.973249, w: 0.229753}
+  kind: wall
+- x: -0.243
+  y: -2.075
+  yaw: 2.35786
+  orientation: {z: 0.924198, w: 0.381914}
+  kind: transit
+- x: -0.2425
+  y: -2.025
+  yaw: 1.56082
+  orientation: {z: 0.70357, w: 0.710626}
+  kind: transit
+- x: -0.2425
+  y: -1.675
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: -0.1925
+  y: -1.575
+  yaw: 1.10715
+  orientation: {z: 0.525731, w: 0.850651}
+  kind: wall
+- x: -0.143
+  y: -1.475
+  yaw: 1.11115
+  orientation: {z: 0.527431, w: 0.849598}
+  kind: transit
+- x: -0.093
+  y: -1.4755
+  yaw: -0.00998
+  orientation: {z: -0.00499, w: 0.999988}
+  kind: transit
+- x: -0.0425
+  y: -1.475
+  yaw: 0.00988
+  orientation: {z: 0.004941, w: 0.999988}
+  kind: wall
+- x: -0.243
+  y: -1.375
+  yaw: 2.67894
+  orientation: {z: 0.973363, w: 0.229268}
+  kind: transit
+- x: -0.3425
+  y: -1.075
+  yaw: 1.89105
+  orientation: {z: 0.810804, w: 0.585318}
+  kind: transit
+- x: -0.3425
+  y: -0.925
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: -0.2925
+  y: -0.825
+  yaw: 1.10715
+  orientation: {z: 0.525731, w: 0.850651}
+  kind: wall
+- x: -0.043
+  y: -0.575
+  yaw: 0.7864
+  orientation: {z: 0.383145, w: 0.923688}
+  kind: transit
+- x: -0.0425
+  y: -0.575
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: transit
+- x: -0.0425
+  y: -0.675
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: -0.093
+  y: -0.6755
+  yaw: -3.13171
+  orientation: {z: -0.999988, w: 0.004941}
+  kind: wall
+- x: -0.093
+  y: -0.275
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: transit
+- x: 0.057
+  y: -0.125
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: transit
+- x: 0.157
+  y: -0.0755
+  yaw: 0.45965
+  orientation: {z: 0.227806, w: 0.973707}
+  kind: transit
+- x: 0.307
+  y: -0.0755
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 0.407
+  y: -0.1255
+  yaw: -0.46365
+  orientation: {z: -0.229753, w: 0.973249}
+  kind: wall
+- x: 0.557
+  y: -0.275
+  yaw: -0.78373
+  orientation: {z: -0.381914, w: 0.924198}
+  kind: transit
+- x: 0.557
+  y: -0.3255
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: transit
+- x: 0.707
+  y: -0.3755
+  yaw: -0.32175
+  orientation: {z: -0.160182, w: 0.987087}
+  kind: wall
+- x: 0.807
+  y: -0.425
+  yaw: -0.45965
+  orientation: {z: -0.227806, w: 0.973707}
+  kind: transit
+- x: 0.8065
+  y: -0.475
+  yaw: -1.58078
+  orientation: {z: -0.710626, w: 0.70357}
+  kind: transit
+- x: 0.857
+  y: -0.5255
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: wall
+- x: 0.907
+  y: -0.525
+  yaw: 0.00998
+  orientation: {z: 0.00499, w: 0.999988}
+  kind: transit
+- x: 0.907
+  y: -0.575
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: transit
+- x: 0.957
+  y: -0.625
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: transit
+- x: 1.2075
+  y: -0.925
+  yaw: -0.87508
+  orientation: {z: -0.423711, w: 0.905797}
+  kind: transit
+- x: 1.1575
+  y: -1.025
+  yaw: -2.03444
+  orientation: {z: -0.850651, w: 0.525731}
+  kind: wall
+- x: 1.157
+  y: -1.1755
+  yaw: -1.57411
+  orientation: {z: -0.708278, w: 0.705934}
+  kind: wall
+- x: 1.1565
+  y: -1.125
+  yaw: 1.58068
+  orientation: {z: 0.710592, w: 0.703605}
+  kind: wall
+- x: 1.0565
+  y: -1.025
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall
+- x: 1.0565
+  y: -0.975
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 0.9565
+  y: -0.875
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall
+- x: 1.407
+  y: -0.7755
+  yaw: 0.21738
+  orientation: {z: 0.108475, w: 0.994099}
+  kind: transit
+- x: 1.607
+  y: -0.7755
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 1.707
+  y: -0.8255
+  yaw: -0.46365
+  orientation: {z: -0.229753, w: 0.973249}
+  kind: wall
+- x: 2.0075
+  y: -1.075
+  yaw: -0.69294
+  orientation: {z: -0.339579, w: 0.940577}
+  kind: transit
+- x: 2.0075
+  y: -1.175
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: 1.957
+  y: -1.1255
+  yaw: 2.36617
+  orientation: {z: 0.925778, w: 0.378069}
+  kind: wall
+- x: 1.8565
+  y: -1.125
+  yaw: 3.13663
+  orientation: {z: 0.999997, w: 0.002483}
+  kind: wall
+- x: 1.8565
+  y: -1.025
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 1.8065
+  y: -0.975
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall
+- x: 1.8065
+  y: -0.925
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 2.007
+  y: -1.175
+  yaw: -0.89484
+  orientation: {z: -0.432641, w: 0.901566}
+  kind: transit
+- x: 1.907
+  y: -0.775
+  yaw: 1.81577
+  orientation: {z: 0.788205, w: 0.615412}
+  kind: transit
+- x: 1.9075
+  y: -0.525
+  yaw: 1.5688
+  orientation: {z: 0.706401, w: 0.707812}
+  kind: transit
+- x: 1.9075
+  y: -0.125
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 1.857
+  y: -0.125
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: 1.8575
+  y: -0.075
+  yaw: 1.56082
+  orientation: {z: 0.70357, w: 0.710626}
+  kind: transit
+- x: 1.8325
+  y: 0.275
+  yaw: 1.6421
+  orientation: {z: 0.731863, w: 0.681452}
+  kind: wall
+- x: 1.8075
+  y: 0.625
+  yaw: 1.6421
+  orientation: {z: 0.731863, w: 0.681452}
+  kind: wall
+- x: 1.407
+  y: 0.875
+  yaw: 2.58355
+  orientation: {z: 0.961326, w: 0.275413}
+  kind: transit
+- x: 1.4075
+  y: 0.925
+  yaw: 1.56082
+  orientation: {z: 0.70357, w: 0.710626}
+  kind: transit
+- x: 1.4075
+  y: 0.975
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 1.2575
+  y: 1.125
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall
+- x: 1.2575
+  y: 1.175
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 1.207
+  y: 1.175
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: 1.2075
+  y: 1.425
+  yaw: 1.5688
+  orientation: {z: 0.706401, w: 0.707812}
+  kind: transit
+- x: 1.207
+  y: 1.4755
+  yaw: 1.58068
+  orientation: {z: 0.710592, w: 0.703605}
+  kind: wall
+- x: 1.057
+  y: 1.325
+  yaw: -2.35453
+  orientation: {z: -0.923561, w: 0.38345}
+  kind: transit
+- x: 0.7777
+  y: 1.1
+  yaw: -2.46344
+  orientation: {z: -0.943062, w: 0.332618}
+  kind: transit
+- x: 0.4984
+  y: 0.875
+  yaw: -2.46344
+  orientation: {z: -0.943062, w: 0.332618}
+  kind: transit
+- x: 0.557
+  y: 0.475
+  yaw: -1.42538
+  orientation: {z: -0.653873, w: 0.756605}
+  kind: fill
+- x: 1.007
+  y: 0.475
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: fill
+- x: 1.107
+  y: 0.0245
+  yaw: -1.35236
+  orientation: {z: -0.625819, w: 0.779968}
+  kind: transit
+- x: 1.257
+  y: 0.0245
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 1.357
+  y: -0.0255
+  yaw: -0.46365
+  orientation: {z: -0.229753, w: 0.973249}
+  kind: wall
+- x: 1.557
+  y: 0.3998
+  yaw: 1.13118
+  orientation: {z: 0.535914, w: 0.844273}
+  kind: transit
+- x: 1.757
+  y: 0.825
+  yaw: 1.13118
+  orientation: {z: 0.535914, w: 0.844273}
+  kind: transit
+- x: 1.557
+  y: 0.625
+  yaw: -2.35619
+  orientation: {z: -0.92388, w: 0.382683}
+  kind: transit
+- x: 1.357
+  y: 0.425
+  yaw: -2.35619
+  orientation: {z: -0.92388, w: 0.382683}
+  kind: transit
+- x: 0.9277
+  y: 0.65
+  yaw: 2.65883
+  orientation: {z: 0.971009, w: 0.239042}
+  kind: fill
+- x: 0.4984
+  y: 0.875
+  yaw: 2.65883
+  orientation: {z: 0.971009, w: 0.239042}
+  kind: fill
+- x: 0.1027
+  y: 1.075
+  yaw: 2.67362
+  orientation: {z: 0.97275, w: 0.231858}
+  kind: transit
+- x: -0.293
+  y: 1.275
+  yaw: 2.67362
+  orientation: {z: 0.97275, w: 0.231858}
+  kind: transit
+- x: -0.343
+  y: 1.275
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: transit
+- x: -0.043
+  y: 1.2255
+  yaw: -0.16353
+  orientation: {z: -0.081674, w: 0.996659}
+  kind: transit
+- x: 0.057
+  y: 1.2255
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 0.157
+  y: 1.2755
+  yaw: 0.46365
+  orientation: {z: 0.229753, w: 0.973249}
+  kind: wall
+- x: 0.257
+  y: 1.3755
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: wall
+- x: 0.557
+  y: 1.3755
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 0.757
+  y: 1.4255
+  yaw: 0.24498
+  orientation: {z: 0.122183, w: 0.992508}
+  kind: wall
+segments:
+- kind: wall
+  points:
+  - [-0.2435, 0.825]
+  - [-0.193, 0.7745]
+- kind: wall
+  points:
+  - [-0.193, 0.2755]
+  - [-0.2483, 0.2479]
+- kind: wall
+  points:
+  - [-0.6425, 0.375]
+  - [-0.6435, 0.425]
+  - [-0.6435, 0.175]
+  - [-0.5935, 0.125]
+  - [-0.5935, -0.225]
+  - [-0.5435, -0.275]
+  - [-0.5435, -0.625]
+  - [-0.4935, -0.675]
+  - [-0.4935, -0.975]
+  - [-0.4435, -1.025]
+  - [-0.4435, -1.2854]
+  - [-0.4435, -1.2854]
+- kind: wall
+  points:
+  - [-0.4435, -1.2854]
+  - [-0.4435, -1.475]
+  - [-0.3935, -1.525]
+  - [-0.3935, -1.925]
+  - [-0.3435, -1.975]
+  - [-0.3435, -2.525]
+  - [-0.2935, -2.575]
+  - [-0.2935, -2.775]
+  - [-0.243, -2.7255]
+  - [-0.143, -2.7255]
+  - [-0.093, -2.7755]
+  - [-0.043, -2.7755]
+- kind: wall
+  points:
+  - [0.307, -2.7245]
+  - [0.4188, -2.7245]
+- kind: wall
+  points:
+  - [1.307, -2.6745]
+  - [1.3802, -2.6745]
+- kind: wall
+  points:
+  - [2.057, -2.7255]
+  - [2.1575, -2.725]
+  - [2.1575, -2.625]
+- kind: wall
+  points:
+  - [2.1075, -2.175]
+  - [2.1075, -2.125]
+  - [2.057, -2.1245]
+  - [2.007, -2.1745]
+  - [1.9863, -2.1745]
+- kind: wall
+  points:
+  - [1.757, -2.1745]
+  - [1.707, -2.1745]
+- kind: wall
+  points:
+  - [1.807, -2.9755]
+  - [1.757, -2.9755]
+- kind: wall
+  points:
+  - [0.7065, -2.575]
+  - [0.7565, -2.475]
+  - [0.7565, -2.4511]
+- kind: wall
+  points:
+  - [0.7065, -1.925]
+  - [0.7065, -1.825]
+  - [0.6565, -1.725]
+  - [0.5565, -1.625]
+  - [0.5565, -1.575]
+  - [0.5065, -1.525]
+  - [0.557, -1.5245]
+- kind: wall
+  points:
+  - [1.307, -1.4745]
+  - [1.3075, -1.625]
+- kind: wall
+  points:
+  - [1.1075, -2.125]
+  - [1.0575, -2.225]
+- kind: wall
+  points:
+  - [0.2565, -3.325]
+  - [0.2565, -3.525]
+- kind: wall
+  points:
+  - [0.557, -3.8255]
+  - [0.507, -3.8255]
+  - [0.307, -3.9755]
+- kind: wall
+  points:
+  - [0.2075, -4.325]
+  - [0.207, -4.3755]
+  - [-0.043, -4.3755]
+- kind: wall
+  points:
+  - [-0.1435, -4.375]
+  - [-0.1435, -3.975]
+  - [-0.1935, -3.775]
+  - [0.007, -3.7745]
+  - [0.107, -3.7245]
+- kind: fill
+  points:
+  - [0.907, -3.225]
+  - [1.157, -3.375]
+- kind: wall
+  points:
+  - [1.6575, -3.325]
+  - [1.6575, -3.375]
+  - [1.7075, -3.425]
+  - [1.7075, -3.575]
+- kind: wall
+  points:
+  - [1.957, -3.8245]
+  - [2.057, -3.8245]
+  - [2.157, -3.7745]
+  - [2.2575, -3.675]
+  - [2.2575, -4.075]
+  - [2.307, -4.1255]
+  - [1.757, -4.1755]
+- kind: wall
+  points:
+  - [1.207, -4.2755]
+  - [1.157, -4.2755]
+  - [1.2065, -4.225]
+  - [1.2065, -4.125]
+  - [1.1565, -4.025]
+- kind: wall
+  points:
+  - [1.057, -3.9255]
+  - [0.757, -3.8255]
+- kind: wall
+  points:
+  - [0.1075, -2.575]
+  - [0.0575, -2.475]
+  - [0.0575, -2.325]
+  - [0.1075, -2.275]
+  - [0.007, -2.2745]
+  - [-0.093, -2.2245]
+- kind: wall
+  points:
+  - [-0.2425, -2.025]
+  - [-0.2425, -1.675]
+  - [-0.1925, -1.575]
+- kind: wall
+  points:
+  - [-0.093, -1.4755]
+  - [-0.0425, -1.475]
+- kind: wall
+  points:
+  - [-0.3425, -1.075]
+  - [-0.3425, -0.925]
+  - [-0.2925, -0.825]
+- kind: gap
+  points:
+  - [-0.043, -0.575]
+  - [-0.043, -0.575]
+- kind: wall
+  points:
+  - [-0.0425, -0.575]
+  - [-0.0425, -0.675]
+  - [-0.093, -0.6755]
+- kind: wall
+  points:
+  - [0.157, -0.0755]
+  - [0.307, -0.0755]
+  - [0.407, -0.1255]
+- kind: wall
+  points:
+  - [0.557, -0.3255]
+  - [0.707, -0.3755]
+- kind: wall
+  points:
+  - [0.8065, -0.475]
+  - [0.857, -0.5255]
+- kind: wall
+  points:
+  - [1.2075, -0.925]
+  - [1.1575, -1.025]
+  - [1.157, -1.1755]
+  - [1.1565, -1.125]
+  - [1.0565, -1.025]
+  - [1.0565, -0.975]
+  - [0.9565, -0.875]
+- kind: wall
+  points:
+  - [1.407, -0.7755]
+  - [1.607, -0.7755]
+  - [1.707, -0.8255]
+- kind: wall
+  points:
+  - [2.0075, -1.075]
+  - [2.0075, -1.175]
+  - [1.957, -1.1255]
+  - [1.8565, -1.125]
+  - [1.8565, -1.025]
+  - [1.8065, -0.975]
+  - [1.8065, -0.925]
+- kind: gap
+  points:
+  - [2.007, -1.175]
+  - [2.007, -1.175]
+- kind: wall
+  points:
+  - [1.9075, -0.525]
+  - [1.9075, -0.125]
+- kind: wall
+  points:
+  - [1.8575, -0.075]
+  - [1.8075, 0.625]
+- kind: wall
+  points:
+  - [1.4075, 0.925]
+  - [1.4075, 0.975]
+  - [1.2575, 1.125]
+  - [1.2575, 1.175]
+- kind: wall
+  points:
+  - [1.2075, 1.425]
+  - [1.207, 1.4755]
+- kind: fill
+  points:
+  - [0.4984, 0.875]
+  - [0.557, 0.475]
+  - [1.007, 0.475]
+- kind: wall
+  points:
+  - [1.107, 0.0245]
+  - [1.257, 0.0245]
+  - [1.357, -0.0255]
+- kind: gap
+  points:
+  - [1.757, 0.825]
+  - [1.757, 0.825]
+- kind: fill
+  points:
+  - [1.357, 0.425]
+  - [0.4984, 0.875]
+- kind: gap
+  points:
+  - [-0.343, 1.275]
+  - [-0.343, 1.275]
+- kind: wall
+  points:
+  - [-0.043, 1.2255]
+  - [0.057, 1.2255]
+  - [0.157, 1.2755]
+  - [0.257, 1.3755]
+  - [0.557, 1.3755]
+  - [0.757, 1.4255]
