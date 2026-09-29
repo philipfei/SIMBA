@@ -20,51 +20,98 @@ def _write_json(path, value):
 
 
 def _draw(grid, start, denominator, panel, output, selected, manifest):
-    import matplotlib
-    matplotlib.use('Agg')
-    import matplotlib.pyplot as plt
-    from matplotlib.colors import ListedColormap
-    from matplotlib.lines import Line2D
-    from matplotlib.patches import Patch
-    background = np.where(grid.cells < 0, 0, np.where(grid.cells == 100, 1, 2))
-    height, width = background.shape
-    extent = [0, width * grid.resolution, 0, height * grid.resolution]
-    fig, axis = plt.subplots(figsize=(9, 10), layout='constrained')
-    axis.imshow(background, origin='lower', extent=extent,
-                cmap=ListedColormap(['#bcc2ca', '#26313f', '#ffffff']),
-                vmin=0, vmax=2, interpolation='nearest')
-    overlay = np.zeros(background.shape)
-    overlay[panel['covered']] = 1
-    overlay[panel['remaining']] = 2
-    axis.imshow(np.ma.masked_where(overlay == 0, overlay), origin='lower', extent=extent,
-                cmap=ListedColormap(['#c3e5d3', '#ffd273']), vmin=1, vmax=2,
-                alpha=0.8, interpolation='nearest')
-    colors = {'boundary': '#764ab5', 'sweep': '#086994',
-              'connector': '#d69739', 'resweep': '#d54879'}
-    handles = []
-    for kind, color in colors.items():
-        present = False
-        for segment in panel['segments']:
-            if segment['kind'] == kind:
-                points = grid.local(segment['points'])
-                axis.plot(points[:, 0], points[:, 1], color=color, linewidth=0.9)
-                present = True
-        if present:
-            handles.append(Line2D([], [], color=color, label=kind.capitalize()))
-    handles.extend([Patch(color='#c3e5d3', label='Ideal covered'),
-                    Patch(color='#ffd273', label='Remaining in denominator'),
-                    Line2D([], [], color='red', marker='*', linestyle='None', label='Example start')])
-    axis.scatter(*grid.local(start), marker='*', color='red', s=75, zorder=10)
+    """Render the standard preview with Pillow, without a Matplotlib runtime dependency."""
+    import base64
+    from io import BytesIO
+    from PIL import Image, ImageDraw, ImageFont
+
+    height, width = grid.cells.shape
+    scale = 10
+    margin, header, footer = 40, 125, 105
+    colors = {
+        'unknown': np.array([188, 194, 202], dtype=np.uint8),
+        'occupied': np.array([38, 49, 63], dtype=np.uint8),
+        'free': np.array([255, 255, 255], dtype=np.uint8),
+        'covered': np.array([195, 229, 211], dtype=np.uint8),
+        'remaining': np.array([255, 210, 115], dtype=np.uint8),
+        'boundary': '#764ab5', 'sweep': '#086994',
+        'connector': '#d69739', 'resweep': '#d54879',
+    }
+    pixels = np.empty((height, width, 3), dtype=np.uint8)
+    pixels[:] = colors['unknown']
+    pixels[grid.cells == 100] = colors['occupied']
+    pixels[grid.cells == 0] = colors['free']
+    pixels[panel['covered']] = colors['covered']
+    pixels[panel['remaining']] = colors['remaining']
+    map_image = Image.fromarray(np.flipud(pixels), 'RGB').resize(
+        (width * scale, height * scale), Image.Resampling.NEAREST)
+    canvas = Image.new('RGB', (width * scale + 2 * margin,
+                               height * scale + header + footer), 'white')
+    canvas.paste(map_image, (margin, header))
+    draw = ImageDraw.Draw(canvas)
+
+    font_path = Path('/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf')
+    def font(size):
+        return ImageFont.truetype(str(font_path), size) if font_path.is_file() else ImageFont.load_default()
+
+    def image_point(world):
+        x, y = grid.local(world)
+        return margin + x / grid.resolution * scale, header + (height - y / grid.resolution) * scale
+
+    present = []
+    for kind in ('boundary', 'sweep', 'connector', 'resweep'):
+        segments = [item for item in panel['segments'] if item['kind'] == kind]
+        if segments:
+            present.append(kind)
+        for segment in segments:
+            points = [image_point(point) for point in segment['points']]
+            if len(points) >= 2:
+                draw.line(points, fill=colors[kind], width=3, joint='curve')
+
+    sx, sy = image_point(start)
+    star = []
+    import math
+    for index in range(10):
+        radius = 10 if index % 2 == 0 else 4
+        angle = -math.pi / 2 + index * math.pi / 5
+        star.append((sx + radius * math.cos(angle), sy + radius * math.sin(angle)))
+    draw.polygon(star, fill='#d7191c')
+    draw.rectangle((margin, header, margin + width * scale, header + height * scale),
+                   outline='#202020', width=2)
+
     stats = panel['stats']
-    axis.set(aspect='equal', xlabel='Map-local x (m)', ylabel='Map-local y (m)',
-             title=(f"Boundary + interior | Ideal {stats['coverage_label']}\n"
-                    f"Direction {selected['angle_deg']:.2f} deg | Offset {selected['offset_m']:.3f} m\n"
-                    f"Path {stats['path_length_m']:.1f} m | Remaining {stats['remaining_m2']:.3f} m^2"))
-    axis.legend(handles=handles, fontsize=8)
-    fig.supxlabel('STATIC IDEAL ESTIMATE ONLY. This is not a closed-loop simulation.', fontsize=9)
-    fig.savefig(output / 'preview.png', dpi=180)
-    fig.savefig(output / 'preview.svg')
-    plt.close(fig)
+    title = f"Boundary + interior | Ideal {stats['coverage_label']}"
+    details = (f"Direction {selected['angle_deg']:.2f} deg | Offset {selected['offset_m']:.3f} m | "
+               f"Path {stats['path_length_m']:.1f} m | Remaining {stats['remaining_m2']:.3f} m^2")
+    draw.text((margin, 18), title, fill='black', font=font(24))
+    draw.text((margin, 55), details, fill='black', font=font(15))
+    draw.text((margin, 82),
+              f"Map-local extent: {width * grid.resolution:.2f} m x {height * grid.resolution:.2f} m",
+              fill='#303030', font=font(14))
+
+    legend = [(kind.capitalize(), colors[kind]) for kind in present]
+    legend += [('Ideal covered', tuple(colors['covered'])),
+               ('Remaining in denominator', tuple(colors['remaining'])),
+               ('Example start', '#d7191c')]
+    x, y = margin, header + height * scale + 20
+    for label, color in legend:
+        draw.rectangle((x, y, x + 18, y + 12), fill=color, outline='#303030')
+        draw.text((x + 25, y - 3), label, fill='black', font=font(13))
+        x += 25 + int(draw.textlength(label, font=font(13))) + 22
+        if x > canvas.width - 180:
+            x, y = margin, y + 25
+    draw.text((margin, canvas.height - 27),
+              'STATIC IDEAL ESTIMATE ONLY. This is not a closed-loop simulation.',
+              fill='#333333', font=font(14))
+
+    png_path = output / 'preview.png'
+    canvas.save(png_path, format='PNG', optimize=True)
+    buffer = BytesIO();canvas.save(buffer, format='PNG', optimize=True)
+    encoded = base64.b64encode(buffer.getvalue()).decode('ascii')
+    (output / 'preview.svg').write_text(
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{canvas.width}" height="{canvas.height}" '
+        f'viewBox="0 0 {canvas.width} {canvas.height}"><image width="100%" height="100%" '
+        f'href="data:image/png;base64,{encoded}"/></svg>\n', encoding='utf-8')
     assert manifest['components']['coverable_mask']
 
 

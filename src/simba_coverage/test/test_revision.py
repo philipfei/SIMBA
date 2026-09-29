@@ -203,3 +203,17 @@ def test_length_splitting_cannot_reintroduce_a_tiny_trimmed_tail():
     assert len(ts)==2
     assert all(.35<=length(points_of(t))<=2. for t in ts)
     assert sum(length(points_of(t)) for t in ts)==pytest.approx(2.1)
+
+
+def test_standard_preview_renderer_requires_only_pillow(tmp_path):
+    from PIL import Image
+    from simba_coverage.preview import _draw
+    g=room();den=g.free.copy();covered=den.copy();remaining=np.zeros_like(den)
+    panel={'covered':covered,'remaining':remaining,'segments':[],
+           'stats':{'coverage_label':'100%','path_length_m':0.,'remaining_m2':0.}}
+    selected={'angle_deg':0.,'offset_m':0.}
+    manifest={'components':{'coverable_mask':'test'}}
+    _draw(g,g.world((5,5)),den,panel,tmp_path,selected,manifest)
+    with Image.open(tmp_path/'preview.png') as image:
+        image.verify()
+    assert (tmp_path/'preview.svg').read_text().startswith('<svg ')
