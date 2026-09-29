@@ -9,7 +9,7 @@ SIMBA/
 |-- README.md                         Operator and development commands
 |-- LICENSE                           Apache-2.0 license
 |-- requirements.yaml                 Required Ubuntu and ROS packages
-|-- .env.example                      Template for host-specific DDS settings
+|-- .env.local                        Tracked DDS settings for both PC and Pi hosts
 `-- src/
     |-- simba_bringup/                 Hardware, launch, teleop, TF, and RViz package
     |   |-- config/
@@ -55,7 +55,7 @@ SIMBA/
             `-- test_ros.py             Loopback ROS service, action, gate, and supervisor tests
 ```
 
-The dependency direction is `simba_bringup -> simba_coverage`. Runtime maps, output, builds, `.env.local`, and host secrets are not tracked.
+The dependency direction is `simba_bringup -> simba_coverage`. Runtime maps, output, builds, and host secrets are not tracked.
 
 ## Build
 
@@ -91,15 +91,14 @@ DDS settings are required **before starting any ROS process that communicates be
 - PC keyboard teleop, RViz, robot topics/services/actions, and live diagnostics: load it.
 - PC-only build, unit tests, Git operations, and offline coverage preview from a saved map: it is not required.
 
-Create each host's private file once:
+The tracked `.env.local` selects `eth0+wlan0` when the hostname is `create3-pi`; every other host uses the verified PC adapter `enx00e17c6840b1`. Philip's and Daniel's PCs use the same adapter name. Verify after hardware or hostname changes:
 
 ```bash
-cd /home/philip/Documents/SIMBA
-cp .env.example .env.local
+hostname -s
 ip -br address
 ```
 
-Edit `.env.local` so the PC interface is the actual Pi-facing interface. On the Pi use `/home/create3-pi/SIMBA/.env.local` and verify `eth0` and `wlan0`. The file is ignored by Git.
+Do not edit `.env.local` separately on a host. Change it in Git so every machine receives the same effective configuration.
 
 Every new live ROS terminal must load settings in this order:
 
