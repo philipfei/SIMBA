@@ -61,17 +61,27 @@ The dependency direction is `simba_bringup -> simba_coverage`. Runtime maps, out
 
 The repository may be cloned anywhere. Enter its root first; `colcon` searches from the current directory.
 
+Install the package-discovery tools once:
+
+```bash
+sudo apt update
+sudo apt install python3-colcon-common-extensions python3-rosdep
+```
+
+Then build from the repository root:
+
 ```bash
 cd /path/to/SIMBA
 test -f src/simba_bringup/package.xml
 test -f src/simba_coverage/package.xml
 source /opt/ros/jazzy/setup.bash
 rosdep install --from-paths src --ignore-src -r -y
+colcon list
 colcon build --symlink-install
 source install/setup.bash
 ```
 
-For Daniel's current checkout, the first command is `cd /home/daniel/NerdShit/JIP/SIMBA`. A `Summary: 0 packages finished` result means `colcon` ran outside the SIMBA root. The Pi installs `rplidar_ros` from apt; it is not a third workspace package.
+For Daniel's current checkout, the first command is `cd /home/daniel/NerdShit/JIP/SIMBA`. A `Summary: 0 packages finished` result means either `colcon` ran outside the SIMBA root or the Colcon discovery extensions are missing. `colcon list` must show both SIMBA packages before building. The Pi installs `rplidar_ros` from apt; it is not a third workspace package.
 
 ## DDS environment
 
