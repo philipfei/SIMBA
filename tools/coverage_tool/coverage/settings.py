@@ -5,8 +5,8 @@ import json
 
 DEFAULTS = {
     'geometry': {
-        'robot_radius_m': 0.25,          # keeps the robot centre this far from walls/obstacles
-        'coverage_disk_radius_m': 0.25,  # radius of the area the tool/sensor covers
+        'robot_radius_m': 0.2,           # keeps the robot centre this far from walls/obstacles
+        'coverage_disk_radius_m': 0.4,   # radius of the area the tool/sensor covers
     },
     'spiral': {
         'overlap_pct': 10.0,             # 0-50 %; path spacing = 2 x coverage radius x (1 - overlap)
