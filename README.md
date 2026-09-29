@@ -59,17 +59,19 @@ The dependency direction is `simba_bringup -> simba_coverage`. Runtime maps, out
 
 ## Build
 
-PC repository: `/home/philip/Documents/SIMBA`. Pi repository: `/home/create3-pi/SIMBA`.
+The repository may be cloned anywhere. Enter its root first; `colcon` searches from the current directory.
 
 ```bash
-cd /home/philip/Documents/SIMBA
+cd /path/to/SIMBA
+test -f src/simba_bringup/package.xml
+test -f src/simba_coverage/package.xml
 source /opt/ros/jazzy/setup.bash
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
-source /home/philip/Documents/SIMBA/install/setup.bash
+source install/setup.bash
 ```
 
-Use the same commands on the Pi after replacing `/home/philip/Documents/SIMBA` with `/home/create3-pi/SIMBA`. The Pi installs `rplidar_ros` from apt; it is not a third workspace package.
+For Daniel's current checkout, the first command is `cd /home/daniel/NerdShit/JIP/SIMBA`. A `Summary: 0 packages finished` result means `colcon` ran outside the SIMBA root. The Pi installs `rplidar_ros` from apt; it is not a third workspace package.
 
 ## DDS environment
 
