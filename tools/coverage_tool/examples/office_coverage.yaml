@@ -1,0 +1,1450 @@
+frame_id: map
+map: examples/office.yaml
+created: '2026-09-28T13:44:28'
+start: [2.025, 2.025]
+area_polygon: []
+stats: {pattern: 'Straight lanes, one direction', cost_total_s: 1061.7344, cost_drive_s: 676.3172, cost_turn_s: 282.5851,
+  cost_reverse_s: 50.0, cost_overlap_s: 52.8321, cost_missed_s: 0.0, sharp_turns: 107, hairpins: 5, overlap_m2: 7.9248, missed_m2: 0.0,
+  coverage_pct: 99.6752, coverage_of_reachable_pct: 100.0, area_m2: 75.4375, covered_m2: 75.1925, path_spacing_m: 0.45, overlap_pct: 10.0,
+  regions: 1, rings: 0, loops: 0, working_length_m: 158.3806, connector_length_m: 44.5145, total_length_m: 202.8952, estimated_time_s: 958.9023,
+  goals: 126, wall_segments: 33, spiral_segments: 0, lane_segments: 69, centre_line_segments: 7, gap_goals: 17, skipped_unreachable: 0,
+  uncovered_reachable_cells: 0, planning_time_s: 59.0799}
+settings:
+  geometry: {robot_radius_m: 0.25, coverage_disk_radius_m: 0.25}
+  spiral: {overlap_pct: 10.0, obstacle_mode: around, wall_side: right}
+  strategy: {mode: auto, wall_loop_first: true}
+  cost: {smooth_turn_deg: 20.0, stop_penalty_s: 1.0, reverse_angle_deg: 150.0, reverse_penalty_s: 10.0, overlap_weight: 1.0,
+    missed_weight: 10000.0}
+  planning: {max_segment_length_m: 2.0}
+  motion: {linear_m_s: 0.3, angular_rad_s: 0.8}
+  optimizer: {search_time_s: 4.0, polish_time_s: 15.0, neighbours: 8}
+poses:
+- x: 2.85
+  y: 2.995
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 4.35
+  y: 2.995
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 5.85
+  y: 2.995
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 5.85
+  y: 2.115
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 4.475
+  y: 2.115
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 3.1
+  y: 2.115
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 2.115
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 1.675
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 3.1
+  y: 1.675
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 4.475
+  y: 1.675
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 5.85
+  y: 1.675
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 5.85
+  y: 2.555
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 4.475
+  y: 2.555
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 3.1
+  y: 2.555
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 2.555
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.8
+  y: 2.825
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: fill_start
+- x: 2.425
+  y: 2.825
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: fill
+- x: 2.875
+  y: 3.435
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 4.4625
+  y: 3.435
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 6.05
+  y: 3.435
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 6.478
+  y: 3.528
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: fill_start
+- x: 6.5573
+  y: 3.5427
+  yaw: -0.7854
+  orientation: {z: -0.382683, w: 0.92388}
+  kind: fill
+- x: 7.225
+  y: 2.115
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 8.925
+  y: 2.115
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 10.625
+  y: 2.115
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 12.325
+  y: 2.115
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 12.325
+  y: 1.675
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 10.625
+  y: 1.675
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 8.925
+  y: 1.675
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 7.225
+  y: 1.675
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 7.225
+  y: 2.555
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 9.025
+  y: 2.555
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 9.525
+  y: 2.675
+  yaw: 0.23554
+  orientation: {z: 0.1175, w: 0.993073}
+  kind: gap
+- x: 8.95
+  y: 2.995
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 7.225
+  y: 2.995
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 6.7835
+  y: 3.166
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall_start
+- x: 6.1751
+  y: 1.8139
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: wall
+- x: 4.6678
+  y: 1.3245
+  yaw: -1.57108
+  orientation: {z: -0.707208, w: 0.707006}
+  kind: wall
+- x: 2.6711
+  y: 1.3245
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 1.3745
+  y: 2.025
+  yaw: 1.57151
+  orientation: {z: 0.707359, w: 0.706855}
+  kind: wall
+- x: 2.2437
+  y: 3.0755
+  yaw: 0.00052
+  orientation: {z: 0.000262, w: 1.0}
+  kind: wall
+- x: 1.8514
+  y: 4.2747
+  yaw: 3.14107
+  orientation: {z: 1.0, w: 0.000262}
+  kind: wall
+- x: 1.3747
+  y: 5.7173
+  yaw: 1.57068
+  orientation: {z: 0.707066, w: 0.707147}
+  kind: wall
+- x: 1.3749
+  y: 7.6365
+  yaw: 1.57068
+  orientation: {z: 0.707066, w: 0.707147}
+  kind: wall
+- x: 2.3052
+  y: 8.6255
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 4.2244
+  y: 8.6255
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 6.1436
+  y: 8.6255
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 8.0628
+  y: 8.6255
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 8.6752
+  y: 7.3185
+  yaw: -1.57061
+  orientation: {z: -0.707043, w: 0.707171}
+  kind: wall
+- x: 9.0479
+  y: 5.6255
+  yaw: -0.00013
+  orientation: {z: -6.7e-05, w: 1.0}
+  kind: wall
+- x: 10.9671
+  y: 5.6252
+  yaw: -0.00013
+  orientation: {z: -6.7e-05, w: 1.0}
+  kind: wall
+- x: 12.6755
+  y: 5.4142
+  yaw: -1.57091
+  orientation: {z: -0.707148, w: 0.707066}
+  kind: wall
+- x: 12.6753
+  y: 3.495
+  yaw: -1.57091
+  orientation: {z: -0.707148, w: 0.707066}
+  kind: wall
+- x: 12.675
+  y: 1.5758
+  yaw: -1.57091
+  orientation: {z: -0.707148, w: 0.707066}
+  kind: wall
+- x: 11.0071
+  y: 1.3245
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 9.0879
+  y: 1.3245
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 7.1687
+  y: 1.3245
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 6.8745
+  y: 2.95
+  yaw: 1.57108
+  orientation: {z: 0.707208, w: 0.707006}
+  kind: wall
+- x: 7.025
+  y: 3.435
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 8.95
+  y: 3.435
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 9.425
+  y: 3.575
+  yaw: 0.28662
+  orientation: {z: 0.142821, w: 0.989749}
+  kind: gap
+- x: 9.525
+  y: 3.675
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: gap
+- x: 9.575
+  y: 3.725
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: gap
+- x: 9.9
+  y: 3.8745
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall_start
+- x: 10.2207
+  y: 3.8745
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+- x: 10.375
+  y: 3.825
+  yaw: -0.31046
+  orientation: {z: -0.154606, w: 0.987976}
+  kind: gap
+- x: 9.125
+  y: 3.875
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 7.5625
+  y: 3.875
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 6.0
+  y: 3.875
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 4.4375
+  y: 3.875
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 2.875
+  y: 3.875
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 2.4
+  y: 5.195
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 1.725
+  y: 5.195
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.625
+  y: 4.275
+  yaw: -1.67907
+  orientation: {z: -0.744332, w: 0.66781}
+  kind: gap
+- x: 1.725
+  y: 4.755
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 2.4
+  y: 4.755
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.675
+  y: 5.225
+  yaw: 0.07476
+  orientation: {z: 0.037372, w: 0.999301}
+  kind: gap
+- x: 8.45
+  y: 5.635
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 7.3125
+  y: 5.635
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 6.175
+  y: 5.635
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 6.175
+  y: 6.075
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 7.2625
+  y: 6.075
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.35
+  y: 6.075
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.35
+  y: 6.515
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 7.2625
+  y: 6.515
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 6.175
+  y: 6.515
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 2.925
+  y: 6.7745
+  yaw: -2.35619
+  orientation: {z: -0.92388, w: 0.382683}
+  kind: wall_start
+- x: 2.7255
+  y: 5.1083
+  yaw: -2.35619
+  orientation: {z: -0.92388, w: 0.382683}
+  kind: wall
+- x: 4.1583
+  y: 4.6755
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: 5.8245
+  y: 4.875
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: wall
+- x: 5.8245
+  y: 6.4357
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 4.4857
+  y: 6.7745
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 2.925
+  y: 6.7745
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 2.4
+  y: 6.515
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 1.725
+  y: 6.515
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 6.955
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 2.65
+  y: 6.955
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 3.025
+  y: 7.075
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: fill_start
+- x: 4.3
+  y: 7.075
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: fill
+- x: 5.575
+  y: 7.075
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: fill
+- x: 5.925
+  y: 6.955
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 7.1375
+  y: 6.955
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.35
+  y: 6.955
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.35
+  y: 7.395
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 6.6937
+  y: 7.395
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 5.0375
+  y: 7.395
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 3.3812
+  y: 7.395
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 7.395
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 7.835
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 3.3812
+  y: 7.835
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 5.0375
+  y: 7.835
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 6.6937
+  y: 7.835
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.35
+  y: 7.835
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.35
+  y: 8.275
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 6.6937
+  y: 8.275
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 5.0375
+  y: 8.275
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 3.3812
+  y: 8.275
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 8.275
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 2.4
+  y: 6.075
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 1.725
+  y: 6.075
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 1.725
+  y: 5.635
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 2.4
+  y: 5.635
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 2.55
+  y: 4.5
+  yaw: -1.4394
+  orientation: {z: -0.659159, w: 0.752004}
+  kind: fill
+- x: 2.9
+  y: 4.315
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 4.785
+  y: 4.315
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 6.67
+  y: 4.315
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 8.555
+  y: 4.315
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 10.44
+  y: 4.315
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 12.325
+  y: 4.315
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 12.325
+  y: 4.755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 10.7875
+  y: 4.755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 9.25
+  y: 4.755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 7.7125
+  y: 4.755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 6.175
+  y: 4.755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 5.825
+  y: 4.375
+  yaw: -2.31512
+  orientation: {z: -0.915826, w: 0.401575}
+  kind: gap
+- x: 6.175
+  y: 5.195
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 7.7125
+  y: 5.195
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 9.25
+  y: 5.195
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 10.7875
+  y: 5.195
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 12.325
+  y: 5.195
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 10.475
+  y: 3.675
+  yaw: -2.45381
+  orientation: {z: -0.941449, w: 0.337155}
+  kind: gap
+- x: 10.375
+  y: 3.775
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: gap
+- x: 10.775
+  y: 3.875
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 12.325
+  y: 3.875
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 12.325
+  y: 3.435
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 11.075
+  y: 3.435
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 10.575
+  y: 3.575
+  yaw: 2.86858
+  orientation: {z: 0.990698, w: 0.136081}
+  kind: gap
+- x: 10.7245
+  y: 3.3707
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall_start
+- x: 10.7245
+  y: 2.975
+  yaw: -1.5708
+  orientation: {z: -0.707107, w: 0.707107}
+  kind: wall
+- x: 10.625
+  y: 2.375
+  yaw: -1.73514
+  orientation: {z: -0.762758, w: 0.646684}
+  kind: fill
+- x: 10.375
+  y: 2.575
+  yaw: 2.46685
+  orientation: {z: 0.943628, w: 0.331007}
+  kind: gap
+- x: 10.475
+  y: 2.675
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: gap
+- x: 10.575
+  y: 2.775
+  yaw: 0.7854
+  orientation: {z: 0.382683, w: 0.92388}
+  kind: gap
+- x: 11.075
+  y: 2.995
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane_start
+- x: 12.325
+  y: 2.995
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: lane
+- x: 12.325
+  y: 2.555
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane_start
+- x: 10.875
+  y: 2.555
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: lane
+- x: 10.2207
+  y: 2.4755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall_start
+- x: 9.775
+  y: 2.4755
+  yaw: 3.14159
+  orientation: {z: 1.0, w: 0.0}
+  kind: wall
+- x: 9.4
+  y: 2.375
+  yaw: -2.87975
+  orientation: {z: -0.991442, w: 0.130548}
+  kind: fill
+- x: 9.625
+  y: 2.575
+  yaw: 0.72664
+  orientation: {z: 0.355381, w: 0.934722}
+  kind: gap
+- x: 9.425
+  y: 2.775
+  yaw: 2.35619
+  orientation: {z: 0.92388, w: 0.382683}
+  kind: gap
+- x: 9.2755
+  y: 2.975
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall_start
+- x: 9.3255
+  y: 3.475
+  yaw: 1.5708
+  orientation: {z: 0.707107, w: 0.707107}
+  kind: wall
+- x: 9.375
+  y: 3.825
+  yaw: 1.4303
+  orientation: {z: 0.655729, w: 0.754996}
+  kind: gap
+- x: 9.675
+  y: 3.8245
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall_start
+- x: 9.725
+  y: 3.8245
+  yaw: 0.0
+  orientation: {z: 0.0, w: 1.0}
+  kind: wall
+segments:
+- kind: lane
+  points:
+  - [2.85, 2.995]
+  - [4.2875, 2.995]
+  - [4.35, 2.995]
+- kind: lane
+  points:
+  - [4.35, 2.995]
+  - [5.85, 2.995]
+- kind: lane
+  points:
+  - [5.85, 2.115]
+  - [4.475, 2.115]
+  - [4.475, 2.115]
+- kind: lane
+  points:
+  - [4.475, 2.115]
+  - [3.1, 2.115]
+  - [3.1, 2.115]
+- kind: lane
+  points:
+  - [3.1, 2.115]
+  - [1.725, 2.115]
+- kind: lane
+  points:
+  - [1.725, 1.675]
+  - [3.1, 1.675]
+  - [3.1, 1.675]
+- kind: lane
+  points:
+  - [3.1, 1.675]
+  - [4.475, 1.675]
+  - [4.475, 1.675]
+- kind: lane
+  points:
+  - [4.475, 1.675]
+  - [5.85, 1.675]
+- kind: lane
+  points:
+  - [5.85, 2.555]
+  - [4.475, 2.555]
+  - [4.475, 2.555]
+- kind: lane
+  points:
+  - [4.475, 2.555]
+  - [3.1, 2.555]
+  - [3.1, 2.555]
+- kind: lane
+  points:
+  - [3.1, 2.555]
+  - [1.725, 2.555]
+- kind: fill
+  points:
+  - [1.8, 2.825]
+  - [2.425, 2.825]
+- kind: lane
+  points:
+  - [2.875, 3.435]
+  - [4.4625, 3.435]
+  - [4.4625, 3.435]
+- kind: lane
+  points:
+  - [4.4625, 3.435]
+  - [6.05, 3.435]
+- kind: fill
+  points:
+  - [6.478, 3.528]
+  - [6.525, 3.575]
+  - [6.5573, 3.5427]
+- kind: lane
+  points:
+  - [7.225, 2.115]
+  - [8.925, 2.115]
+  - [8.925, 2.115]
+- kind: lane
+  points:
+  - [8.925, 2.115]
+  - [10.625, 2.115]
+  - [10.625, 2.115]
+- kind: lane
+  points:
+  - [10.625, 2.115]
+  - [12.325, 2.115]
+- kind: lane
+  points:
+  - [12.325, 1.675]
+  - [10.625, 1.675]
+  - [10.625, 1.675]
+- kind: lane
+  points:
+  - [10.625, 1.675]
+  - [8.925, 1.675]
+  - [8.925, 1.675]
+- kind: lane
+  points:
+  - [8.925, 1.675]
+  - [7.225, 1.675]
+- kind: lane
+  points:
+  - [7.225, 2.555]
+  - [9.025, 2.555]
+- kind: gap
+  points:
+  - [9.525, 2.675]
+  - [9.525, 2.675]
+- kind: lane
+  points:
+  - [8.95, 2.995]
+  - [7.225, 2.995]
+- kind: wall
+  points:
+  - [6.7835, 3.166]
+  - [6.675, 3.2745]
+  - [6.375, 3.2745]
+  - [6.1755, 3.075]
+  - [6.1751, 1.8139]
+  - [6.1751, 1.8139]
+- kind: wall
+  points:
+  - [6.1751, 1.8139]
+  - [6.175, 1.3245]
+  - [4.6678, 1.3245]
+  - [4.6678, 1.3245]
+- kind: wall
+  points:
+  - [4.6678, 1.3245]
+  - [2.6711, 1.3245]
+  - [2.6711, 1.3245]
+- kind: wall
+  points:
+  - [2.6711, 1.3245]
+  - [1.375, 1.3245]
+  - [1.3745, 2.025]
+- kind: wall
+  points:
+  - [1.3745, 2.025]
+  - [1.3745, 3.075]
+  - [2.2261, 3.0754]
+  - [2.2437, 3.0755]
+- kind: wall
+  points:
+  - [2.2437, 3.0755]
+  - [2.325, 3.0755]
+  - [2.5245, 3.275]
+  - [2.5245, 4.075]
+  - [2.325, 4.2745]
+  - [1.8865, 4.2747]
+  - [1.8514, 4.2747]
+- kind: wall
+  points:
+  - [1.8514, 4.2747]
+  - [1.3745, 4.275]
+  - [1.3747, 5.6646]
+  - [1.3747, 5.7173]
+- kind: wall
+  points:
+  - [1.3747, 5.7173]
+  - [1.3749, 7.5663]
+  - [1.3749, 7.6365]
+- kind: wall
+  points:
+  - [1.3749, 7.6365]
+  - [1.375, 8.6255]
+  - [2.2174, 8.6255]
+  - [2.3052, 8.6255]
+- kind: wall
+  points:
+  - [2.3052, 8.6255]
+  - [4.119, 8.6255]
+  - [4.2244, 8.6255]
+- kind: wall
+  points:
+  - [4.2244, 8.6255]
+  - [6.0207, 8.6255]
+  - [6.1436, 8.6255]
+- kind: wall
+  points:
+  - [6.1436, 8.6255]
+  - [7.9223, 8.6255]
+  - [8.0628, 8.6255]
+- kind: wall
+  points:
+  - [8.0628, 8.6255]
+  - [8.675, 8.6255]
+  - [8.6752, 7.4766]
+  - [8.6752, 7.3185]
+- kind: wall
+  points:
+  - [8.6752, 7.3185]
+  - [8.6755, 5.875]
+  - [8.8877, 5.6628]
+  - [8.925, 5.6255]
+  - [9.0479, 5.6255]
+- kind: wall
+  points:
+  - [9.0479, 5.6255]
+  - [10.7739, 5.6253]
+  - [10.9671, 5.6252]
+- kind: wall
+  points:
+  - [10.9671, 5.6252]
+  - [12.6755, 5.625]
+  - [12.6755, 5.4142]
+- kind: wall
+  points:
+  - [12.6755, 5.4142]
+  - [12.6753, 3.6284]
+  - [12.6753, 3.495]
+- kind: wall
+  points:
+  - [12.6753, 3.495]
+  - [12.675, 1.6317]
+  - [12.675, 1.5758]
+- kind: wall
+  points:
+  - [12.675, 1.5758]
+  - [12.675, 1.3245]
+  - [11.0071, 1.3245]
+- kind: wall
+  points:
+  - [11.0071, 1.3245]
+  - [10.9856, 1.3245]
+  - [9.0879, 1.3245]
+- kind: wall
+  points:
+  - [9.0879, 1.3245]
+  - [8.989, 1.3245]
+  - [7.1687, 1.3245]
+- kind: wall
+  points:
+  - [7.1687, 1.3245]
+  - [6.9924, 1.3245]
+  - [6.875, 1.3245]
+  - [6.8745, 2.95]
+- kind: lane
+  points:
+  - [7.025, 3.435]
+  - [8.95, 3.435]
+- kind: gap
+  points:
+  - [9.425, 3.575]
+  - [9.425, 3.575]
+- kind: gap
+  points:
+  - [9.525, 3.675]
+  - [9.525, 3.675]
+- kind: gap
+  points:
+  - [9.575, 3.725]
+  - [9.575, 3.725]
+- kind: wall
+  points:
+  - [9.9, 3.8745]
+  - [10.2207, 3.8745]
+- kind: gap
+  points:
+  - [10.375, 3.825]
+  - [10.375, 3.825]
+- kind: lane
+  points:
+  - [9.125, 3.875]
+  - [7.6562, 3.875]
+  - [7.5625, 3.875]
+- kind: lane
+  points:
+  - [7.5625, 3.875]
+  - [6.0625, 3.875]
+  - [6.0, 3.875]
+- kind: lane
+  points:
+  - [6.0, 3.875]
+  - [4.4687, 3.875]
+  - [4.4375, 3.875]
+- kind: lane
+  points:
+  - [4.4375, 3.875]
+  - [2.875, 3.875]
+- kind: lane
+  points:
+  - [2.4, 5.195]
+  - [1.725, 5.195]
+- kind: gap
+  points:
+  - [1.625, 4.275]
+  - [1.625, 4.275]
+- kind: lane
+  points:
+  - [1.725, 4.755]
+  - [2.4, 4.755]
+- kind: gap
+  points:
+  - [8.675, 5.225]
+  - [8.675, 5.225]
+- kind: lane
+  points:
+  - [8.45, 5.635]
+  - [7.3125, 5.635]
+  - [7.3125, 5.635]
+- kind: lane
+  points:
+  - [7.3125, 5.635]
+  - [6.175, 5.635]
+- kind: lane
+  points:
+  - [6.175, 6.075]
+  - [7.2625, 6.075]
+  - [7.2625, 6.075]
+- kind: lane
+  points:
+  - [7.2625, 6.075]
+  - [8.35, 6.075]
+- kind: lane
+  points:
+  - [8.35, 6.515]
+  - [7.2625, 6.515]
+  - [7.2625, 6.515]
+- kind: lane
+  points:
+  - [7.2625, 6.515]
+  - [6.175, 6.515]
+- kind: wall
+  points:
+  - [2.925, 6.7745]
+  - [2.7255, 6.575]
+  - [2.7255, 5.1083]
+  - [2.7255, 5.1083]
+- kind: wall
+  points:
+  - [2.7255, 5.1083]
+  - [2.7255, 4.875]
+  - [2.925, 4.6755]
+  - [4.1583, 4.6755]
+  - [4.1583, 4.6755]
+- kind: wall
+  points:
+  - [4.1583, 4.6755]
+  - [5.625, 4.6755]
+  - [5.8245, 4.875]
+- kind: wall
+  points:
+  - [5.8245, 4.875]
+  - [5.8245, 6.4357]
+  - [5.8245, 6.4357]
+- kind: wall
+  points:
+  - [5.8245, 6.4357]
+  - [5.8245, 6.575]
+  - [5.625, 6.7745]
+  - [4.4857, 6.7745]
+  - [4.4857, 6.7745]
+- kind: wall
+  points:
+  - [4.4857, 6.7745]
+  - [2.925, 6.7745]
+- kind: lane
+  points:
+  - [2.4, 6.515]
+  - [1.725, 6.515]
+- kind: lane
+  points:
+  - [1.725, 6.955]
+  - [2.65, 6.955]
+- kind: fill
+  points:
+  - [3.025, 7.075]
+  - [4.3, 7.075]
+  - [4.3, 7.075]
+- kind: fill
+  points:
+  - [4.3, 7.075]
+  - [5.575, 7.075]
+- kind: lane
+  points:
+  - [5.925, 6.955]
+  - [7.1375, 6.955]
+  - [7.1375, 6.955]
+- kind: lane
+  points:
+  - [7.1375, 6.955]
+  - [8.35, 6.955]
+- kind: lane
+  points:
+  - [8.35, 7.395]
+  - [6.6937, 7.395]
+  - [6.6937, 7.395]
+- kind: lane
+  points:
+  - [6.6937, 7.395]
+  - [5.0375, 7.395]
+  - [5.0375, 7.395]
+- kind: lane
+  points:
+  - [5.0375, 7.395]
+  - [3.3812, 7.395]
+  - [3.3812, 7.395]
+- kind: lane
+  points:
+  - [3.3812, 7.395]
+  - [1.725, 7.395]
+- kind: lane
+  points:
+  - [1.725, 7.835]
+  - [3.3812, 7.835]
+  - [3.3812, 7.835]
+- kind: lane
+  points:
+  - [3.3812, 7.835]
+  - [5.0375, 7.835]
+  - [5.0375, 7.835]
+- kind: lane
+  points:
+  - [5.0375, 7.835]
+  - [6.6937, 7.835]
+  - [6.6937, 7.835]
+- kind: lane
+  points:
+  - [6.6937, 7.835]
+  - [8.35, 7.835]
+- kind: lane
+  points:
+  - [8.35, 8.275]
+  - [6.6937, 8.275]
+  - [6.6937, 8.275]
+- kind: lane
+  points:
+  - [6.6937, 8.275]
+  - [5.0375, 8.275]
+  - [5.0375, 8.275]
+- kind: lane
+  points:
+  - [5.0375, 8.275]
+  - [3.3812, 8.275]
+  - [3.3812, 8.275]
+- kind: lane
+  points:
+  - [3.3812, 8.275]
+  - [1.725, 8.275]
+- kind: lane
+  points:
+  - [2.4, 6.075]
+  - [1.725, 6.075]
+- kind: lane
+  points:
+  - [1.725, 5.635]
+  - [2.4, 5.635]
+- kind: fill
+  points:
+  - [2.55, 4.5]
+  - [2.55, 4.5]
+- kind: lane
+  points:
+  - [2.9, 4.315]
+  - [4.685, 4.315]
+  - [4.785, 4.315]
+- kind: lane
+  points:
+  - [4.785, 4.315]
+  - [6.595, 4.315]
+  - [6.67, 4.315]
+- kind: lane
+  points:
+  - [6.67, 4.315]
+  - [8.505, 4.315]
+  - [8.555, 4.315]
+- kind: lane
+  points:
+  - [8.555, 4.315]
+  - [10.415, 4.315]
+  - [10.44, 4.315]
+- kind: lane
+  points:
+  - [10.44, 4.315]
+  - [12.325, 4.315]
+- kind: lane
+  points:
+  - [12.325, 4.755]
+  - [10.7875, 4.755]
+  - [10.7875, 4.755]
+- kind: lane
+  points:
+  - [10.7875, 4.755]
+  - [9.25, 4.755]
+  - [9.25, 4.755]
+- kind: lane
+  points:
+  - [9.25, 4.755]
+  - [7.7125, 4.755]
+  - [7.7125, 4.755]
+- kind: lane
+  points:
+  - [7.7125, 4.755]
+  - [6.175, 4.755]
+- kind: gap
+  points:
+  - [5.825, 4.375]
+  - [5.825, 4.375]
+- kind: lane
+  points:
+  - [6.175, 5.195]
+  - [7.7125, 5.195]
+  - [7.7125, 5.195]
+- kind: lane
+  points:
+  - [7.7125, 5.195]
+  - [9.25, 5.195]
+  - [9.25, 5.195]
+- kind: lane
+  points:
+  - [9.25, 5.195]
+  - [10.7875, 5.195]
+  - [10.7875, 5.195]
+- kind: lane
+  points:
+  - [10.7875, 5.195]
+  - [12.325, 5.195]
+- kind: gap
+  points:
+  - [10.475, 3.675]
+  - [10.475, 3.675]
+- kind: gap
+  points:
+  - [10.375, 3.775]
+  - [10.375, 3.775]
+- kind: lane
+  points:
+  - [10.775, 3.875]
+  - [12.325, 3.875]
+- kind: lane
+  points:
+  - [12.325, 3.435]
+  - [11.075, 3.435]
+- kind: gap
+  points:
+  - [10.575, 3.575]
+  - [10.575, 3.575]
+- kind: wall
+  points:
+  - [10.7245, 3.3707]
+  - [10.7245, 2.975]
+- kind: fill
+  points:
+  - [10.625, 2.375]
+  - [10.625, 2.375]
+- kind: gap
+  points:
+  - [10.375, 2.575]
+  - [10.375, 2.575]
+- kind: gap
+  points:
+  - [10.475, 2.675]
+  - [10.475, 2.675]
+- kind: gap
+  points:
+  - [10.575, 2.775]
+  - [10.575, 2.775]
+- kind: lane
+  points:
+  - [11.075, 2.995]
+  - [12.325, 2.995]
+- kind: lane
+  points:
+  - [12.325, 2.555]
+  - [10.875, 2.555]
+- kind: wall
+  points:
+  - [10.2207, 2.4755]
+  - [9.775, 2.4755]
+- kind: fill
+  points:
+  - [9.4, 2.375]
+  - [9.4, 2.375]
+- kind: gap
+  points:
+  - [9.625, 2.575]
+  - [9.625, 2.575]
+- kind: gap
+  points:
+  - [9.425, 2.775]
+  - [9.425, 2.775]
+- kind: wall
+  points:
+  - [9.2755, 2.975]
+  - [9.2755, 3.375]
+  - [9.3255, 3.425]
+  - [9.3255, 3.475]
+- kind: gap
+  points:
+  - [9.375, 3.825]
+  - [9.375, 3.825]
+- kind: wall
+  points:
+  - [9.675, 3.8245]
+  - [9.725, 3.8245]
