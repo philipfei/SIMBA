@@ -18,6 +18,10 @@ class SafetyGate(Node):
     def __init__(self):
         super().__init__('velocity_safety_gate')
         self.mapping=parameter(self,'mapping_mode',False)
+        self.supervised_mapping=parameter(self,'supervised_mapping',False)
+        if self.supervised_mapping and not self.mapping:
+            raise ValueError('supervised_mapping requires mapping_mode')
+        self.external_leases=not self.mapping or self.supervised_mapping
         self.settings=node_settings(self);m=self.settings['motion']
         self.inputs=Inputs(self);self.policy=Ownership(m['linear_m_s'],m['angular_rad_s'],m['linear_accel_m_s2'],m['angular_accel_rad_s2'],self.settings)
         self.last_trust=0.;self.trusted=False;self.peer_hash=''
@@ -35,14 +39,14 @@ class SafetyGate(Node):
         self.create_subscription(EmptyMsg,'/control/manual_heartbeat',self.manual_heartbeat,10)
         self.create_service(Trigger,'/safety/reset',self.reset)
         self.create_service(Trigger,'/safety/estop',self.stop_service)
-        if self.mapping:self.create_service(SetBool,'/control/manual',self.manual)
+        if self.mapping and not self.supervised_mapping:self.create_service(SetBool,'/control/manual',self.manual)
         self.create_timer(1/self.settings['health']['gate_rate_hz'],self.tick);self.create_timer(self.settings['health']['graph_period_s'],self.check_graph)
 
     def command(self,source,msg):
         self.policy.receive(source,(msg.linear.x,msg.angular.z),time.monotonic())
 
     def lease(self,msg):
-        if self.mapping:return
+        if not self.external_leases:return
         try:
             d=decode(msg)
             self.peer_hash=d.get('config_hash','')
@@ -56,7 +60,7 @@ class SafetyGate(Node):
 
     def manual_heartbeat(self,_msg):
         self.last_manual_heartbeat=time.monotonic()
-        if self.mapping and self.policy.owner=='MANUAL':self.policy.lease_time=self.last_manual_heartbeat
+        if self.mapping and not self.supervised_mapping and self.policy.owner=='MANUAL':self.policy.lease_time=self.last_manual_heartbeat
 
     def manual(self,req,res):
         health_reason=self.inputs.reason()
@@ -78,7 +82,11 @@ class SafetyGate(Node):
         extra=[f'{item.node_namespace}/{item.node_name}:{bytes(item.endpoint_gid).hex()}' for item in publishers if item not in own]
         names=[name for name,_ in nodes]
         localization_conflict=('amcl' in names if self.mapping else any('slam_toolbox' in name for name in names))
-        self.graph_conflicts=extra+duplicate+(['LOCALIZATION_OWNER_CONFLICT'] if localization_conflict else [])
+        coordinator_conflict=self.supervised_mapping and (names.count('exploration_coordinator') != 1 or
+            any(name in names for name in ('coverage_supervisor','coverage_meter')) or
+            names.count('planner_server') > 1 or names.count('controller_server') > 1 or
+            names.count('slam_toolbox') > 1)
+        self.graph_conflicts=extra+duplicate+(['LOCALIZATION_OWNER_CONFLICT'] if localization_conflict else [])+(['COORDINATOR_CONFLICT'] if coordinator_conflict else [])
         self.graph_ok=len(publishers)==1 and len(own)==1 and not self.graph_conflicts
         self.graph_reason='' if self.graph_ok else 'CMD_VEL_OR_NODE_OWNERSHIP_CONFLICT'
         if not self.graph_ok and time.monotonic()-self.graph_started>=1.0:self.policy.latch(self.graph_reason)
@@ -134,11 +142,12 @@ class SafetyGate(Node):
             self.policy.latch('WHEELS_DISABLED')
         if wheel and not wheel.wheels_enabled:reason=reason or 'WHEELS_DISABLED'
         if not self.graph_ok:reason=reason or self.graph_reason
-        if self.policy.owner in ('NAV','NATIVE') and (not self.trusted or now-self.last_trust>self.settings['health']['gate_age_s']):
+        requires_trust=self.policy.owner=='NAV' or (self.policy.owner=='NATIVE' and not self.supervised_mapping)
+        if requires_trust and (not self.trusted or now-self.last_trust>self.settings['health']['gate_age_s']):
             reason=reason or 'LOCALIZATION_LOST'
-        if not self.mapping and self.policy.owner!='NONE' and now-self.last_lease>self.settings['health']['lease_age_s']:
+        if self.external_leases and self.policy.owner!='NONE' and now-self.last_lease>self.settings['health']['lease_age_s']:
             reason=reason or 'SUPERVISOR_HEARTBEAT_LOST'
-        if not self.mapping and self.policy.owner!='NONE' and self.peer_hash!=self.settings.hash:
+        if self.external_leases and self.policy.owner!='NONE' and self.peer_hash!=self.settings.hash:
             reason=reason or 'CONFIG_HASH_MISMATCH'
         if self.policy.owner=='NATIVE' and (reason or self.policy.fault):
             # Native firmware owns motion: silence alone would not stop it.
@@ -161,6 +170,14 @@ class SafetyGate(Node):
 
 
 def _stop_before_shutdown(node):
+    if node.supervised_mapping and node.policy.owner=='NATIVE':
+        # Launch may signal all children concurrently. Never rely on the
+        # coordinator outliving this gate while a firmware action is active.
+        node.assert_estop('GATE_SHUTDOWN_DURING_NATIVE')
+        deadline=time.monotonic()+node.settings['health']['stop_confirm_timeout_s']
+        while rclpy.ok() and time.monotonic()<deadline and not node.owns_estop:
+            rclpy.spin_once(node,timeout_sec=.05)
+        return
     if node.policy.owner not in ('NAV','MANUAL') or 1 in node.inputs.hazards():
         return
     started=time.monotonic();sent=0

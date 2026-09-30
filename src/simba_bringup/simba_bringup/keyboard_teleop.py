@@ -90,9 +90,16 @@ def main(args=None):
     parser = argparse.ArgumentParser()
     parser.add_argument('--config-dir', default=str(default_config_dir()))
     parser.add_argument('--measure-key-repeat', action='store_true')
+    parser.add_argument('--mode', choices=('manual', 'exploration'), default='manual')
+    parser.add_argument('--rviz', action='store_true')
     parsed, ros_args = parser.parse_known_args(args)
     if parsed.measure_key_repeat:
         measure_repeat(); return
+    if parsed.mode == 'exploration':
+        from .exploration_teleop import run
+        run(parsed, ros_args); return
+    if parsed.rviz:
+        parser.error('--rviz requires --mode exploration')
     terminal = termios.tcgetattr(sys.stdin)
     rclpy.init(args=ros_args)
     node = KeyboardTeleop(parsed.config_dir)

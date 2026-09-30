@@ -173,7 +173,7 @@ class Settings:
                 'map_frame', 'odom_frame', 'base_frame')},
         }
 
-    def render_nav2(self, map_yaml, directory=None, stamped_supported=True):
+    def render_nav2(self, map_yaml='', directory=None, stamped_supported=True, live_map=False):
         nav2 = deepcopy(self.values['nav2'])
         runtime = self.values['runtime']
         motion = self.values['motion']
@@ -198,6 +198,22 @@ class Settings:
             controller['enable_stamped_cmd_vel'] = False
         else:
             controller.pop('enable_stamped_cmd_vel', None)
+        if live_map:
+            profile = _read(self.config_dir / 'exploration_params.yaml')['navigation']
+            nav2.pop('amcl')
+            nav2.pop('map_server')
+            nav2['planner_server']['ros__parameters']['GridBased'].update(
+                tolerance=profile['planner_tolerance_m'], allow_unknown=False,
+                use_final_approach_orientation=False)
+            controller['goal_checker'].update(
+                xy_goal_tolerance=profile['goal_xy_m'], yaw_goal_tolerance=profile['goal_yaw_rad'])
+            controller['FollowPath']['use_rotate_to_heading'] = True
+            global_params = nav2['global_costmap']['global_costmap']['ros__parameters']
+            global_params.update(rolling_window=False, map_topic='/map')
+            global_params.pop('width', None)
+            global_params.pop('height', None)
+            global_params['static_layer'].update(
+                map_topic='/map', map_subscribe_transient_local=True, subscribe_to_updates=False)
         target = Path(directory) if directory else Path(tempfile.mkdtemp(prefix='simba-nav2-'))
         target.mkdir(parents=True, exist_ok=True)
         output = target / f'nav2-{self.hash}.yaml'

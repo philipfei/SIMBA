@@ -9,8 +9,8 @@ from launch_ros.actions import Node
 
 def _setup(context):
     mode = LaunchConfiguration('mode').perform(context)
-    if mode not in ('slam', 'coverage'):
-        raise RuntimeError('mode must be slam or coverage')
+    if mode not in ('slam', 'coverage', 'exploration'):
+        raise RuntimeError('mode must be slam, coverage or exploration')
     config = Path(get_package_share_directory('simba_bringup')) / 'rviz' / f'{mode}.rviz'
     return [Node(package='rviz2', executable='rviz2', name=f'simba_{mode}_rviz',
                  arguments=['-d', str(config), '--ros-args', '-r', '/tf:=/tf_relay',

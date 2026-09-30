@@ -1,0 +1,112 @@
+Panels:
+- Class: rviz_common/Displays
+  Name: Displays
+- Class: rviz_common/Views
+  Name: Views
+Visualization Manager:
+  Class: ''
+  Displays:
+  - Alpha: 0.5
+    Cell Size: 1
+    Class: rviz_default_plugins/Grid
+    Color: 160; 160; 164
+    Enabled: true
+    Name: Grid
+    Plane: XY
+    Plane Cell Count: 20
+    Reference Frame: <Fixed Frame>
+  - Alpha: 0.7
+    Class: rviz_default_plugins/Map
+    Color Scheme: map
+    Draw Behind: true
+    Enabled: true
+    Name: Map
+    Topic:
+      Depth: 5
+      Durability Policy: Transient Local
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /map
+    Update Topic:
+      Depth: 5
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Reliable
+      Value: /map_updates
+  - Alpha: 1
+    Autocompute Intensity Bounds: true
+    Autocompute Value Bounds:
+      Max Value: 10
+      Min Value: -10
+      Value: true
+    Axis: Z
+    Channel Name: intensity
+    Class: rviz_default_plugins/LaserScan
+    Color: 255; 30; 30
+    Color Transformer: FlatColor
+    Decay Time: 0
+    Enabled: true
+    Name: LiDAR Scan
+    Position Transformer: XYZ
+    Selectable: true
+    Size (Pixels): 3
+    Size (m): 0.01
+    Style: Points
+    Topic:
+      Depth: 10
+      Durability Policy: Volatile
+      History Policy: Keep Last
+      Reliability Policy: Best Effort
+      Value: /scan
+    Use Fixed Frame: true
+  - Class: rviz_default_plugins/TF
+    Enabled: true
+    Frame Timeout: 15
+    Marker Scale: 0.5
+    Name: TF
+    Show Arrows: true
+    Show Axes: true
+    Show Names: true
+  - Class: rviz_default_plugins/Pose
+    Name: Dock-ready approach
+    Enabled: true
+    Topic:
+      Value: /exploration/home
+      Depth: 1
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    Shape: Arrow
+    Color: 0; 220; 80
+  - Class: rviz_default_plugins/Path
+    Name: Return-home path
+    Enabled: true
+    Topic:
+      Value: /exploration/path
+      Depth: 1
+      Durability Policy: Transient Local
+      Reliability Policy: Reliable
+    Color: 0; 160; 220
+    Line Style: Lines
+    Line Width: 0.025
+  Enabled: true
+  Global Options:
+    Background Color: 35; 35; 35
+    Fixed Frame: map
+    Frame Rate: 30
+  Name: root
+  Tools:
+  - Class: rviz_default_plugins/Interact
+  - Class: rviz_default_plugins/MoveCamera
+  - Class: rviz_default_plugins/Select
+  - Class: rviz_default_plugins/FocusCamera
+  - Class: rviz_default_plugins/Measure
+  Views:
+    Current:
+      Angle: 0
+      Class: rviz_default_plugins/TopDownOrtho
+      Name: Top Down
+      Scale: 30
+      Target Frame: map
+Window Geometry:
+  Height: 900
+  Width: 1400

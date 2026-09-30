@@ -23,5 +23,6 @@ setup(
         'keyboard_teleop = simba_bringup.keyboard_teleop:main',
         'tf_relay = simba_bringup.tf_relay:main',
         'velocity_gate = simba_bringup.velocity_gate:main',
+        'exploration_coordinator = simba_bringup.exploration_coordinator:main',
     ]},
 )
