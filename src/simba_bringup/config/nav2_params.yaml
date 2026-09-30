@@ -160,3 +160,21 @@ global_costmap:
         plugin: nav2_costmap_2d::InflationLayer
         inflation_radius: 0.35
         cost_scaling_factor: 5.0
+bt_navigator:
+  ros__parameters:
+    use_sim_time: false
+    global_frame: map
+    robot_base_frame: base_footprint
+    odom_topic: /odom
+    transform_tolerance: 0.3
+    bt_loop_duration: 10
+    default_server_timeout: 20
+    wait_for_service_timeout: 1000
+    action_server_result_timeout: 900.0
+    navigators:
+    - navigate_through_poses
+    navigate_through_poses:
+      plugin: nav2_bt_navigator::NavigateThroughPosesNavigator
+    error_code_names:
+    - compute_path_error_code
+    - follow_path_error_code

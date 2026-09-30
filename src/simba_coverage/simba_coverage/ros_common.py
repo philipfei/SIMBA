@@ -130,14 +130,17 @@ class ActionSlot:
     @property
     def idle(self):return not self.records
 
-    def send(self,typ,name,goal):
+    def send(self,typ,name,goal,feedback=None):
         if self.records:raise RuntimeError('Previous action has not terminated')
         client=self.client(typ,name)
         if not client.server_is_ready():raise RuntimeError(name+' server unavailable')
         record={'key':self.mission.action_id(),'name':name,'handle':None,'canceled':False,
                 'sent':time.monotonic(),'cancel_at':None}
         self.records.append(record)
-        try:future=client.send_goal_async(goal)
+        # Feedback from a canceled or superseded goal must not update the current mission.
+        def relay(msg):
+            if feedback and not record['canceled'] and self.mission.current(record['key']):feedback(msg.feedback)
+        try:future=client.send_goal_async(goal,feedback_callback=relay if feedback else None)
         except Exception:
             self.records.remove(record);raise
         future.add_done_callback(lambda f:self.accepted(record,f))

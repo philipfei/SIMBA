@@ -160,7 +160,7 @@ The YAML/JSON file contains `poses`: the whole driven path in order, transit inc
 
 **On the SIMBA robot**, run the plan with `coverage.launch.py plan:=FILE`; see *Drive an exported coverage_tool plan* in the repository README. Plan with **robot radius 0.23 m or more**: SIMBA refuses a path that comes within 0.20 m of a wall, and this tool's per-cell clearance check is up to half a cell more lenient than SIMBA's exact one.
 
-`send_to_nav2.py` is for a plain Nav2 stack only. It does not work with SIMBA's coverage launch, which runs no `bt_navigator` and only passes velocity commands from its own supervisor. It sends the poses with **NavigateThroughPoses**: the robot drives through them without stopping. Use `--waypoints` for FollowWaypoints (the robot stops at every pose, so it is much slower). `--set-initial-pose` also tells AMCL that the robot is at the plan start. This script has not been tested on a robot yet.
+`send_to_nav2.py` is for a plain Nav2 stack only. It does not work with SIMBA's coverage launch: SIMBA's velocity gate only passes Nav2 commands while its own supervisor holds the lease, and that supervisor already sends the plan with NavigateThroughPoses. It sends the poses with **NavigateThroughPoses**: the robot drives through them without stopping. Use `--waypoints` for FollowWaypoints (the robot stops at every pose, so it is much slower). `--set-initial-pose` also tells AMCL that the robot is at the plan start. This script has not been tested on a robot yet.
 
 ## Command line
 

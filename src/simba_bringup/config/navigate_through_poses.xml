@@ -1,0 +1,49 @@
+<!--
+  SIMBA NavigateThroughPoses tree for exported coverage_tool plans. Adapted from Nav2 jazzy's
+  navigate_through_poses_w_replanning_and_recovery.xml:
+  - Replans through the remaining plan poses at 1 Hz so the global planner routes around
+    obstacles that the costmaps pick up from the LiDAR.
+  - RemovePassedGoals radius is 0.25 m instead of 0.7 m: plan poses sit at every corner (often
+    only a few cm apart), and a large radius would drop them and cut the corners of the plan.
+  - Controller, planner, goal and progress checker are fixed; no selector topics.
+  - Recovery only clears the costmaps. There is no Spin, BackUp or Wait, so no behavior_server
+    and no motion that bypasses the velocity gate. Retries and skipping a blocked pose are
+    handled by coverage_supervisor.
+-->
+<root BTCPP_format="4" main_tree_to_execute="MainTree">
+  <BehaviorTree ID="MainTree">
+    <RecoveryNode number_of_retries="2" name="NavigateRecovery">
+      <PipelineSequence name="NavigateWithReplanning">
+        <RateController hz="1.0">
+          <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
+            <ReactiveSequence>
+              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.25"/>
+              <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased" error_code_id="{compute_path_error_code}"/>
+            </ReactiveSequence>
+            <Sequence>
+              <WouldAPlannerRecoveryHelp error_code="{compute_path_error_code}"/>
+              <ClearEntireCostmap name="ClearGlobalCostmap-Context" service_name="global_costmap/clear_entirely_global_costmap"/>
+            </Sequence>
+          </RecoveryNode>
+        </RateController>
+        <RecoveryNode number_of_retries="1" name="FollowPath">
+          <FollowPath path="{path}" controller_id="FollowPath" goal_checker_id="goal_checker" progress_checker_id="progress_checker" error_code_id="{follow_path_error_code}"/>
+          <Sequence>
+            <WouldAControllerRecoveryHelp error_code="{follow_path_error_code}"/>
+            <ClearEntireCostmap name="ClearLocalCostmap-Context" service_name="local_costmap/clear_entirely_local_costmap"/>
+          </Sequence>
+        </RecoveryNode>
+      </PipelineSequence>
+      <Sequence>
+        <Fallback>
+          <WouldAControllerRecoveryHelp error_code="{follow_path_error_code}"/>
+          <WouldAPlannerRecoveryHelp error_code="{compute_path_error_code}"/>
+        </Fallback>
+        <Sequence name="ClearingActions">
+          <ClearEntireCostmap name="ClearLocalCostmap-Subtree" service_name="local_costmap/clear_entirely_local_costmap"/>
+          <ClearEntireCostmap name="ClearGlobalCostmap-Subtree" service_name="global_costmap/clear_entirely_global_costmap"/>
+        </Sequence>
+      </Sequence>
+    </RecoveryNode>
+  </BehaviorTree>
+</root>

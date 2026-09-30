@@ -75,6 +75,12 @@ def test_config_hash_ignores_comments_order_and_numeric_spelling(tmp_path):
     assert changed.hash!=base.hash
     rendered=yaml.safe_load(changed.render_nav2('/tmp/map.yaml',tmp_path/'rendered').read_text())
     assert rendered['controller_server']['ros__parameters']['FollowPath']['desired_linear_vel']==.11
+    navigator=rendered['bt_navigator']['ros__parameters']
+    assert navigator['navigators']==['navigate_through_poses']
+    assert navigator['robot_base_frame']==changed['runtime']['base_frame'] and navigator['global_frame']==changed['runtime']['map_frame']
+    assert navigator['default_nav_through_poses_bt_xml']==str(tmp_path/'config'/'navigate_through_poses.xml')
+    (tmp_path/'config'/'navigate_through_poses.xml').unlink()
+    with pytest.raises(ValueError,match='Missing behavior tree'):changed.render_nav2('/tmp/map.yaml',tmp_path/'rendered')
 
 
 @pytest.mark.parametrize('change',[('area_tie_tolerance_ratio',.002),('min_trim_segment_length_m',0),('stripe_spacing_m',-1)])

@@ -13,7 +13,7 @@ from rclpy.signals import SignalHandlerOptions
 from rclpy.time import Time
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path as PathMsg
-from nav2_msgs.action import ComputePathToPose, FollowPath
+from nav2_msgs.action import ComputePathToPose, FollowPath, NavigateThroughPoses
 from irobot_create_msgs.action import Dock, Undock
 from std_msgs.msg import String
 from std_srvs.srv import Trigger, SetBool, Empty
@@ -23,13 +23,13 @@ from .geometry import Grid, validate_polygon, wrap
 from .planner import sweeps, ordered, gap_targets
 from .state import Mission
 from .params import node_settings, approval_manifest, canonical_hash
-from .planning import optimize, boundary_routes, connect, points_of, split_path, trim_stripes, length
+from .planning import optimize, boundary_routes, connect, points_of, poly_target, split_path, trim_stripes, length
 from .health import Trust
 from .plan_file import load_plan
 from .ros_common import (Inputs, ActionSlot, LATCHED, LATEST, parameter, decode, json_msg,
                          diagnostic, pose_msg, path_msg, pose3, transform3, yaw, ros_now, stamp_seconds)
 
-ACTIVE={'UNDOCK','CONNECT_PLAN','CONNECT','SWEEP','DWELL','GAP_PLANNING','BUMP_WAIT',
+ACTIVE={'UNDOCK','CONNECT_PLAN','CONNECT','SWEEP','THROUGH','DWELL','GAP_PLANNING','BUMP_WAIT',
         'PHASE_WAIT','RETURN_PLAN','RETURN','DOCK_WAIT','DOCK','TEST_PLAN','TEST','NATIVE_ARM','DOCK_CONFIRM'}
 
 
@@ -50,7 +50,7 @@ class Supervisor(Node):
         self.coverage_phase='MAIN';self.sample_seq=0;self.phase_barrier=0;self.meter_config_hash=''
         self.trim_residual=[];self.phase_checks=[];self.work_previous_phase='MAIN';self.work_previous_round=0;self.work_previous_round_area=0.
         self.inputs=Inputs(self);self.mission=Mission(recovery=self.settings['recovery']);self.slot=ActionSlot(self,self.mission)
-        for typ,name in [(ComputePathToPose,'/compute_path_to_pose'),(FollowPath,'/follow_path'),(Dock,'/dock'),(Undock,'/undock')]:
+        for typ,name in [(ComputePathToPose,'/compute_path_to_pose'),(FollowPath,'/follow_path'),(NavigateThroughPoses,'/navigate_through_poses'),(Dock,'/dock'),(Undock,'/undock')]:
             self.slot.client(typ,name)
         self.trust=Trust(self.settings);self.trusted=False;self.pose=None;self.odom_pose=None;self.amcl=None
         self.live_map=False;self.amcl_received=0.;self.scan_stamp=None;self.scan_score=(0,0)
@@ -61,6 +61,7 @@ class Supervisor(Node):
         self.return_since=0.;self.round_start_area=0.;self.gain_area=0.;self.no_gain=0.;self.last_tick=time.monotonic()
         self.bump_since=None;self.bump_clear=None;self.bump_locations=[];self.before_bump=''
         self.pending_native=None;self.pending_phase=None;self.path=None;self.path_end_yaw=None;self.test_goal=None
+        self.through_points=[];self.through_remaining=0
         self.worker_pool=ThreadPoolExecutor(max_workers=1);self.work=None;self.work_kind='';self.work_key=None
         self.dock={};self.load_dock()
         self.lease_pub=self.create_publisher(String,'/coverage/lease',LATEST)
@@ -157,7 +158,7 @@ class Supervisor(Node):
         if self.mission.generation:
             self.sample_seq+=1
             self.sample_pub.publish(json_msg({'generation':self.mission.generation,'sample_seq':self.sample_seq,'stamp':ros_now(self)-self.settings['localization']['tf_delay_s'],
-                'pose':pose or [0.,0.,0.],'trusted':self.trusted,'active':self.mission.state in ('CONNECT','SWEEP','DWELL','RETURN','PHASE_WAIT') and not self.manual}))
+                'pose':pose or [0.,0.,0.],'trusted':self.trusted,'active':self.mission.state in ('CONNECT','SWEEP','THROUGH','DWELL','RETURN','PHASE_WAIT') and not self.manual}))
 
     def stationary_update(self):
         if self.inputs.stopped() and self.nomotion.service_is_ready() and not self.nomotion_pending:
@@ -211,7 +212,7 @@ class Supervisor(Node):
 
     def plan_preview(self,grid,start,polygon):
         plan=load_plan(self.plan_file,grid,self.settings['runtime']['map_yaml'],self.map_frame,self.collision,
-                       self.settings['planning']['max_segment_length_m'])
+                       self.settings['planning']['through_poses_chunk_m'])
         reachable=grid.reachable(start,self.collision,self.settings['recovery']['planner_start_tolerance_m'])
         first=grid.cell(plan['points'][0])
         if not grid.valid(first) or not reachable[first]:raise ValueError('PLAN_START_UNREACHABLE from the robot position')
@@ -264,6 +265,7 @@ class Supervisor(Node):
         if self.mission.state not in ACTIVE and self.mission.state!='PREPARING':return
         if self.mission.state=='GAP_PLANNING':
             self.coverage_phase=self.work_previous_phase;self.mission.rounds=self.work_previous_round;self.round_start_area=self.work_previous_round_area
+        if self.plan_file and self.current:self.current=poly_target(self.plan_rest(),'plan')  # Resume continues at the next unreached pose.
         self.slot.cancel();self.pending_phase=None;self.mission.pause(reason,time.monotonic())
         self.save_report()
 
@@ -279,7 +281,7 @@ class Supervisor(Node):
         if self.mission.coverage_finished:self.pending_phase='RETURN'
         else:
             self.check_start_component()
-            if self.current and not self.mission.excluded(self.current):self.targets.insert(0,self.current)
+            if self.current and (self.plan_file or not self.mission.excluded(self.current)):self.targets.insert(0,self.current)
             self.current=None;self.pending_phase='UNDOCK' if self.is_docked() else 'NEXT'
         self.phase_since=time.monotonic();return 'Resume accepted; retained exclusions and original mission deadline'
 
@@ -375,13 +377,46 @@ class Supervisor(Node):
         self.slot.send(FollowPath,'/follow_path',goal)
 
     def next_target(self):
-        self.current=None
+        self.current=None;self.through_points=[]
         while self.targets:
             t=self.targets.pop(0)
-            if not self.mission.excluded(t):self.current=t;break
+            # Exported-plan chunks skip blocked poses themselves (plan_failure) instead of whole chunks.
+            if self.plan_file or not self.mission.excluded(t):self.current=t;break
         if self.current is None:self.finish_pass();return
         self.target_since=time.monotonic()
-        self.plan_to(self.current.start,'CONNECT_PLAN')
+        if self.plan_file:self.through(points_of(self.current))
+        else:self.plan_to(self.current.start,'CONNECT_PLAN')
+
+    def through(self,points):
+        # Nav2's bt_navigator replans through the remaining poses, so it drives to the chunk start and around obstacles.
+        goal=NavigateThroughPoses.Goal();goal.poses=path_msg(self,points).poses
+        self.path=[list(p) for p in points];self.through_points=list(self.path);self.through_remaining=len(points)
+        self.mission.state='THROUGH';self.phase_since=time.monotonic();self.motion_pose=list(self.pose);self.last_motion=time.monotonic()
+        self.slot.send(NavigateThroughPoses,'/navigate_through_poses',goal,self.through_feedback)
+
+    def through_feedback(self,feedback):
+        # RemovePassedGoals drops reached poses from the front, so the count identifies the next plan pose.
+        remaining=int(feedback.number_of_poses_remaining)
+        if 0<remaining<self.through_remaining:self.through_remaining=remaining;self.target_since=time.monotonic()
+
+    def plan_rest(self):
+        if not self.through_points:return points_of(self.current)
+        return self.through_points[len(self.through_points)-self.through_remaining:]
+
+    def plan_failure(self,reason):
+        # Retry from the next unreached pose; a pose that keeps failing is skipped with its surroundings.
+        self.slot.cancel()
+        if not self.mission.root_cause:self.mission.root_cause=reason
+        now=time.monotonic();rest=self.plan_rest();blocked=rest[0]
+        key='pose:%.3f,%.3f'%tuple(blocked);count=self.mission.failures.get(key,0)+1;self.mission.failures[key]=count
+        event={'time':now,'target':key,'reason':reason}
+        if count>=self.settings['recovery']['target_attempts']:
+            radius=self.settings['recovery']['blockage_radius_m']
+            rest=rest[next((i for i,p in enumerate(rest) if math.dist(p,blocked)>radius),len(rest)):]
+            self.mission.blocked.append({'xy':list(blocked),'radius':radius,'reason':'PLAN_POSE_SKIPPED','time':now});event['skipped']=True
+        if rest:self.targets.insert(0,poly_target(rest,'plan'))
+        self.mission.events.append(event)
+        self.current=None;self.through_points=[];self.mission.state='PREPARING';self.pending_phase='NEXT';self.phase_since=now
 
     def begin_sweep(self):
         t=self.current
@@ -441,6 +476,7 @@ class Supervisor(Node):
         self.slot.cancel();self.pending_phase=None;self.mission.change('FAILED',reason,time.monotonic());self.save_report()
 
     def target_failure(self,reason):
+        if self.plan_file and self.current:self.plan_failure(reason);return
         self.slot.cancel()
         if not self.mission.root_cause:self.mission.root_cause=reason
         if self.current:
@@ -471,11 +507,12 @@ class Supervisor(Node):
     def action_result(self,name,status,result,error):
         phase=self.mission.state
         success=status==4 and not error and getattr(result,'error_code',0)==0
-        if success and phase in ('CONNECT','SWEEP','RETURN','TEST') and self.path:
+        if success and phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST') and self.path:
             if math.dist(self.pose[:2],self.path[-1])>self.settings['recovery']['endpoint_tolerance_m']:
                 success=False;error='ACTION_SUCCEEDED_WITHOUT_REACHING_ENDPOINT'
         if not success:
-            if phase in ('CONNECT_PLAN','CONNECT','SWEEP'):self.target_failure(error or 'NAVIGATION_FAILED')
+            if phase=='THROUGH' and not error:error=f"NAVIGATE_THROUGH_POSES_ERROR_{getattr(result,'error_code','')}: {getattr(result,'error_msg','')}"
+            if phase in ('CONNECT_PLAN','CONNECT','SWEEP','THROUGH'):self.target_failure(error or 'NAVIGATION_FAILED')
             else:self.pause(error or 'ACTION_FAILED')
             return
         if phase=='UNDOCK':
@@ -494,7 +531,7 @@ class Supervisor(Node):
             points.insert(0,list(self.pose[:2]))
             self.follow(points,{'CONNECT_PLAN':'CONNECT','RETURN_PLAN':'RETURN','TEST_PLAN':'TEST'}[phase],self.path_end_yaw)
         elif phase=='CONNECT':self.begin_sweep()
-        elif phase=='SWEEP':self.next_target()
+        elif phase in ('SWEEP','THROUGH'):self.next_target()
         elif phase=='RETURN':self.mission.state='DOCK_WAIT';self.phase_since=time.monotonic()
         elif phase=='DOCK':
             if getattr(result,'is_docked',False):
@@ -543,7 +580,7 @@ class Supervisor(Node):
                 if fault:self.pause(fault)
                 elif not self.mission.coverage_finished and phase not in ('RETURN_PLAN','RETURN','DOCK_WAIT','DOCK','TEST_PLAN','TEST','DOCK_CONFIRM') and self.inputs.messages['battery_state'].percentage<=self.settings['battery']['return_ratio']:
                     self.slot.cancel();self.mission.coverage_finished=True;self.mission.state='PREPARING';self.pending_phase='RETURN';self.phase_since=now;self.mission.reason='LOW_BATTERY_RETURN'
-                elif phase in ('CONNECT','SWEEP','CONNECT_PLAN') and now-self.target_since>=self.settings['deadlines']['target_s']:self.target_failure('TARGET_TIMEOUT')
+                elif phase in ('CONNECT','SWEEP','THROUGH','CONNECT_PLAN') and now-self.target_since>=self.settings['deadlines']['target_s']:self.target_failure('TARGET_TIMEOUT')
                 elif phase in ('RETURN_PLAN','RETURN') and now-self.return_since>=self.settings['deadlines']['return_s']:self.pause('RETURN_TIMEOUT')
                 elif phase in ('UNDOCK','DOCK') and now>=self.native_deadline:self.pause('NATIVE_ACTION_TIMEOUT')
                 elif phase.endswith('_PLAN') and now-self.phase_since>=self.settings['deadlines']['planning_s']:
@@ -551,13 +588,13 @@ class Supervisor(Node):
                     else:self.pause('PLAN_TIMEOUT')
                 elif phase=='GAP_PLANNING' and now-self.phase_since>=self.settings['deadlines']['planning_s']:self.pause('GAP_PLAN_TIMEOUT')
                 elif phase=='TEST' and now-self.target_since>=self.settings['deadlines']['target_s']:self.pause('TEST_TIMEOUT')
-                elif phase in ('CONNECT','SWEEP','RETURN','TEST'):
+                elif phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST'):
                     if self.motion_pose is None or math.dist(self.pose[:2],self.motion_pose[:2])>=self.settings['recovery']['movement_translation_m'] or abs(wrap(self.pose[2]-self.motion_pose[2]))>=self.settings['recovery']['movement_rotation_rad']:
                         self.motion_pose=list(self.pose);self.last_motion=now
                     if now-self.last_motion>=self.settings['deadlines']['no_motion_s']:
-                        if phase in ('CONNECT','SWEEP'):self.target_failure('NO_MOVEMENT')
+                        if phase in ('CONNECT','SWEEP','THROUGH'):self.target_failure('NO_MOVEMENT')
                         else:self.pause('NO_MOVEMENT')
-                if self.mission.state in ('SWEEP','DWELL'):
+                if self.mission.state in ('SWEEP','THROUGH','DWELL'):
                     area=self.measurement.get('covered_m2',0.)
                     if area>self.gain_area:self.gain_area=area;self.no_gain=0.
                     else:self.no_gain+=max(0,dt)
@@ -600,7 +637,7 @@ class Supervisor(Node):
         except (ValueError,RuntimeError,KeyError) as e:
             self.pause('EXECUTION_CHECK: '+str(e))
         phase=self.mission.state
-        owner='MANUAL' if self.manual else ('NATIVE' if phase in ('UNDOCK','DOCK','NATIVE_ARM') else ('NAV' if phase in ('CONNECT','SWEEP','RETURN','TEST') else 'NONE'))
+        owner='MANUAL' if self.manual else ('NATIVE' if phase in ('UNDOCK','DOCK','NATIVE_ARM') else ('NAV' if phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST') else 'NONE'))
         self.lease_pub.publish(json_msg({'config_hash':self.settings.hash,'owner':owner,'epoch':self.mission.generation+':'+str(self.mission.token)}))
         data={'config_hash':self.settings.hash,'coverage_phase':self.coverage_phase,'generation':self.mission.generation,'state':phase,'reason':self.mission.reason,'root_cause':self.mission.root_cause,
               'trusted':self.trusted,'trust_reason':self.trust.reason,'preview_ready':self.preview is not None,
@@ -611,9 +648,9 @@ class Supervisor(Node):
     def handle_bump(self,now):
         phase=self.mission.state;hazards=self.inputs.hazards()
         if phase in ('UNDOCK','DOCK','NATIVE_ARM','DOCK_CONFIRM'):return  # Native behavior owns its normal bump/proximity handling.
-        if 5 in hazards and phase in ('CONNECT','SWEEP','RETURN','TEST'):
+        if 5 in hazards and phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST'):
             self.pause('OBJECT_PROXIMITY');return
-        if 1 in hazards and phase in ('CONNECT','SWEEP','RETURN','TEST','BUMP_WAIT'):
+        if 1 in hazards and phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST','BUMP_WAIT'):
             if phase!='BUMP_WAIT':
                 near=sum(math.dist(self.pose[:2],p)<self.settings['recovery']['bump_repeat_radius_m'] for p in self.bump_locations)
                 self.bump_locations.append(list(self.pose[:2]))
@@ -624,7 +661,7 @@ class Supervisor(Node):
         elif phase=='BUMP_WAIT':
             if self.bump_clear is None:self.bump_clear=now
             if now-self.bump_clear>=self.settings['recovery']['bump_clear_s'] and self.slot.idle and self.inputs.stopped():
-                if self.before_bump in ('CONNECT','SWEEP'):self.target_failure('BUMP_REPLAN')
+                if self.before_bump in ('CONNECT','SWEEP','THROUGH'):self.target_failure('BUMP_REPLAN')
                 else:self.pause('BUMP_DURING_RETURN_OR_TEST')
 
     def publish_visuals(self):

@@ -68,7 +68,10 @@ Edge cells left are reported, allowed by design. Last run: 8/8 pass, 0 cells mis
   `src/simba_coverage/simba_coverage/plan_file.py`). SIMBA refuses plans closer than 0.20 m to walls with an exact
   capsule check, so plan with robot radius >= 0.23 m. `map_image_sha256` in the export lets the robot reject plans
   made on another map. `examples/map_ME_room1v4_coveragev3.yaml` is the 0.23 m plan for the real room map.
-- `send_to_nav2.py` only fits a plain Nav2 stack (SIMBA runs no bt_navigator). Untested. Before trusting it:
+- SIMBA drives the plan with NavigateThroughPoses in 6 m chunks through its own supervisor and `bt_navigator`
+  (tree: `src/simba_bringup/config/navigate_through_poses.xml`), so the velocity gate and lease still apply.
+- `send_to_nav2.py` only fits a plain Nav2 stack, not SIMBA (its velocity gate only passes Nav2 output while the
+  supervisor holds the lease). Untested. Before trusting it:
   same map in Nav2 as in the planner, set initial pose (`nav.setInitialPose`), match Nav2 `robot_radius`/inflation
   to the planner's robot radius, check goal tolerances vs waypoint spacing, consistent `use_sim_time`.
 - Calibrate `stop_penalty_s`, `bend_s_per_rad`, `angular_rad_s` from real Create3 logs.

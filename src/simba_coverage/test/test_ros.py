@@ -20,7 +20,7 @@ from rclpy.action import ActionServer,CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from geometry_msgs.msg import Twist,TransformStamped,PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry,OccupancyGrid
-from nav2_msgs.action import FollowPath,ComputePathToPose
+from nav2_msgs.action import FollowPath,ComputePathToPose,NavigateThroughPoses
 from sensor_msgs.msg import LaserScan,BatteryState
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -290,34 +290,70 @@ def test_new_meter_generation_discards_previous_phase_acknowledgement(ros):
     assert meter.generation=='new' and meter.last_active_sample_seq==0 and meter.sample_seq==0
 
 
-def test_exported_plan_is_driven_in_order_and_finishes_without_dock(ros):
+def run_plan(ros,points,blocked=None):
+    """Drive an exported plan through a fake bt_navigator that reports RemovePassedGoals-style feedback."""
     import yaml
     add,pump,_,tmp_path=ros
-    points=[[2.,2.],[2.6,2.],[2.6,2.6],[2.,2.6]]
     plan=tmp_path/'plan.yaml'
     plan.write_text(yaml.safe_dump({'frame_id':'map','poses':[{'x':x,'y':y,'orientation':{'z':0.,'w':1.}} for x,y in points]}))
     gate=add(SafetyGate());sup=add(Supervisor());meter=add(CoverageMeter());fake=add(FakeInputs())
     fake.request_owner=None;fake.publish_trust=False;fake.publish_map(sup.base);sup.plan_file=str(plan)
-    driven=[]
-    def planner(handle):
-        result=ComputePathToPose.Result();result.path=path_msg(fake,[[fake.x,fake.y],[handle.request.goal.pose.position.x,handle.request.goal.pose.position.y]])
-        handle.succeed();return result
-    def follow(handle):
-        driven.append((gate.policy.owner,[[p.pose.position.x,p.pose.position.y] for p in handle.request.path.poses]))
-        end=handle.request.path.poses[-1].pose.position
-        fake.x,fake.y=end.x,end.y;time.sleep(.4);handle.succeed();return FollowPath.Result()
-    servers=[ActionServer(fake,ComputePathToPose,'/compute_path_to_pose',execute_callback=planner,callback_group=ReentrantCallbackGroup()),
-             ActionServer(fake,FollowPath,'/follow_path',execute_callback=follow,callback_group=ReentrantCallbackGroup())]
+    goals=[]
+    def navigate(handle):
+        poses=[[p.pose.position.x,p.pose.position.y] for p in handle.request.poses]
+        goals.append((gate.policy.owner,poses))
+        for i,xy in enumerate(poses):
+            handle.publish_feedback(NavigateThroughPoses.Feedback(number_of_poses_remaining=len(poses)-i))
+            if blocked and math.dist(xy,blocked)<1e-6:
+                time.sleep(.2);handle.abort();return NavigateThroughPoses.Result(error_code=308,error_msg='NO_VALID_PATH')
+            fake.x,fake.y=xy;time.sleep(.2)
+        handle.succeed();return NavigateThroughPoses.Result()
+    server=ActionServer(fake,NavigateThroughPoses,'/navigate_through_poses',execute_callback=navigate,callback_group=ReentrantCallbackGroup())
     end=time.monotonic()+15.
     while not (sup.trusted and sup.config_ready()) and time.monotonic()<end:pump(.2)
     assert sup.trusted,sup.trust.reason
     # Built synchronously: the GIL-bound worker is starved by this test's tight executor loop.
     sup.grid=sup.make_grid();sup.preview=sup.plan_preview(sup.grid,sup.pose[:2],sup.region)
-    sup.start();pump(12.)
+    # Sensor messages were not processed while the preview was built; wait until they are fresh again.
+    end=time.monotonic()+10.
+    while not (sup.trusted and not sup.inputs.reason()) and time.monotonic()<end:pump(.2)
+    sup.start()
+    end=time.monotonic()+20.
+    while sup.mission.state not in ('FINISHED','FAILED','PAUSED') and time.monotonic()<end:pump(.2)
+    server.destroy()
+    return sup,goals,plan
+
+
+def test_exported_plan_is_driven_through_poses_and_finishes_without_dock(ros):
+    points=[[2.,2.],[2.6,2.],[2.6,2.6],[2.,2.6]]
+    sup,goals,plan=run_plan(ros,points)
     assert sup.mission.state=='FINISHED' and sup.mission.reason=='PLAN_COMPLETE',(sup.mission.state,sup.mission.reason,sup.mission.events)
-    assert all(owner=='NAV' for owner,_ in driven)
-    route=[xy for _,path in driven for xy in path]
-    hits=[min(i for i,xy in enumerate(route) if math.dist(corner,xy)<1e-3) for corner in points[1:]]
-    assert hits==sorted(hits),route
-    assert json.loads((sup.output/('task_'+sup.mission.generation+'.json')).read_text())['plan_file']==str(plan)
-    for server in servers:server.destroy()
+    # One NavigateThroughPoses goal per chunk, sent while the gate lease is NAV, with the plan poses in order.
+    assert [owner for owner,_ in goals]==['NAV'] and np.allclose(goals[0][1],points)
+    report=json.loads((sup.output/('task_'+sup.mission.generation+'.json')).read_text())
+    assert report['plan_file']==str(plan) and not report['temporary_blockages']
+
+
+def test_blocked_plan_pose_is_retried_from_there_then_skipped(ros):
+    points=[[1.,1.],[2.,1.],[2.,2.],[1.,2.]]
+    sup,goals,_=run_plan(ros,points,blocked=[2.,2.])
+    assert sup.mission.state=='FINISHED' and sup.mission.reason=='PLAN_COMPLETE',(sup.mission.state,sup.mission.reason,sup.mission.events)
+    # Retry resumes at the unreached pose instead of the chunk start; the second failure skips it.
+    assert [np.round(poses,3).tolist() for _,poses in goals]==[points,points[2:],points[3:]]
+    assert all(owner=='NAV' for owner,_ in goals)
+    assert sup.mission.failures=={'pose:2.000,2.000':2}
+    assert [(b['xy'],b['reason']) for b in sup.mission.blocked]==[([2.,2.],'PLAN_POSE_SKIPPED')]
+    assert [e.get('skipped',False) for e in sup.mission.events if 'target' in e]==[False,True]
+    assert sup.mission.root_cause.startswith('NAVIGATE_THROUGH_POSES_ERROR_308')
+
+
+def test_pause_mid_chunk_resumes_at_next_unreached_plan_pose(ros):
+    from simba_coverage.planning import poly_target
+    add,_,_,_=ros;sup=add(Supervisor());sup.plan_file='plan.yaml'
+    points=[[1.,1.],[2.,1.],[2.,2.],[1.,2.]]
+    sup.mission.start(time.monotonic());sup.mission.state='THROUGH'
+    sup.current=poly_target(points,'plan');sup.through_points=points;sup.through_remaining=len(points)
+    for remaining in (3,2,3):sup.through_feedback(NavigateThroughPoses.Feedback(number_of_poses_remaining=remaining))
+    assert sup.through_remaining==2
+    sup.pause('OPERATOR_PAUSE')
+    assert sup.mission.state=='PAUSED' and sup.current.points==points[2:]

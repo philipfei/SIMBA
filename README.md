@@ -18,6 +18,7 @@ SIMBA/
     |   |   |-- lidar_params.yaml      RPLIDAR serial settings and base-to-laser transform
     |   |   |-- slam_toolbox.yaml      Mapping-mode SLAM Toolbox parameters
     |   |   |-- nav2_params.yaml       Nav2 template rewritten with effective robot parameters
+    |   |   |-- navigate_through_poses.xml  Nav2 behavior tree for exported plans (no motion recoveries)
     |   |   `-- offline_maps.yaml      Map hash and versioned offline example start points
     |   |-- launch/
     |   |   |-- lidar.launch.py        Static laser TF and optional RPLIDAR driver
@@ -272,7 +273,16 @@ The gate is the sole `/cmd_vel` publisher. Nav2 publishes `/cmd_vel_nav`; teleop
 
 ## Drive an exported coverage_tool plan
 
-`tools/coverage_tool` plans a path on the PC and exports it as a `.yaml` file. Launching coverage with `plan:=` makes the supervisor drive that path instead of planning on the robot. Nav2, the velocity gate, localization trust, bump handling, battery and deadline checks work exactly as in fixed-map coverage. No `approved_hash` is needed: the plan file passed at launch is the approval.
+`tools/coverage_tool` plans a path on the PC and exports it as a `.yaml` file. Launching coverage with `plan:=` makes the supervisor drive that path instead of planning on the robot. The velocity gate, localization trust, bump handling, battery and deadline checks work exactly as in fixed-map coverage. No `approved_hash` is needed: the plan file passed at launch is the approval.
+
+With `plan:=` the launch also starts Nav2's `bt_navigator`. The supervisor splits the plan into chunks of `through_poses_chunk_m` (6 m, about 20–45 poses) and sends each chunk as one **NavigateThroughPoses** goal, while it holds the NAV lease:
+
+- Nav2 replans through the remaining poses once per second (`config/navigate_through_poses.xml`), so the robot drives around obstacles that the LiDAR adds to the costmaps. A pose is dropped once the robot is within 0.25 m of it.
+- The robot stops briefly at the end of each chunk.
+- The tree's recoveries only clear the costmaps. Nav2's spin/back-up behaviors are not used, and no `behavior_server` runs.
+- If a goal fails (for example, a pose is blocked by an obstacle), the supervisor retries from the next unreached pose. After `target_attempts` failures at the same pose, it skips that pose and the plan poses within `blockage_radius_m` of it, and continues. Skipped poses are listed in the task report under `temporary_blockages` with reason `PLAN_POSE_SKIPPED`.
+- `target_s` is the time allowed to reach the next plan pose, not a whole chunk.
+- Pause and resume continue at the next unreached pose.
 
 The plan must be made on the same map that the Pi loads, with **robot radius at least 0.23 m** in coverage_tool. The supervisor refuses a plan that comes within 0.20 m (`body_radius_m` + `planning_padding_m`) of a wall or unknown cell, and a plan whose `map_image_sha256` does not match the loaded map image. The tool checks clearance per grid cell, so 0.20 m in the tool is not enough.
 

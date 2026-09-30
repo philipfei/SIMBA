@@ -5,6 +5,7 @@
       min_trim_segment_length_m: 0.35
       area_tie_tolerance_ratio: 0.001
       max_segment_length_m: 2.0
+      through_poses_chunk_m: 6.0
       stationary_target_length_m: 0.01
       alignment: auto
       manual_angle_deg: 0.0

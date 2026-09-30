@@ -25,11 +25,22 @@ def test_coverage_launch_has_exact_nav2_process_contract_and_remap():
     }
     assert all(token in text for token in expected)
     assert "CONTROLLER_REMAPS = [('cmd_vel', '/cmd_vel_nav'), ('/cmd_vel', '/cmd_vel_nav')]" in text
-    # An exported plan is executed by the supervisor, not handed to a separate navigator.
     assert "'plan_file'" in text and text.count("'plan_file'")==1
-    for forbidden in ('bt_navigator', 'waypoint_follower', 'smoother_server',
-                      'velocity_smoother', 'behavior_server', 'collision_monitor'):
+    # An exported plan adds only bt_navigator (NavigateThroughPoses), under the supervisor's lease.
+    assert "if plan:\n        nodes.append(_node('nav2_bt_navigator', 'bt_navigator', 'bt_navigator', parameters=[str(nav_file)]))" in text
+    assert "(['bt_navigator'] if plan else [])" in text
+    for forbidden in ('waypoint_follower', 'smoother_server', 'velocity_smoother',
+                      'behavior_server', 'nav2_behaviors', 'collision_monitor'):
         assert forbidden not in text
+
+
+def test_navigate_through_poses_tree_has_no_motion_behaviors():
+    tree = (ROOT / 'simba_bringup' / 'config' / 'navigate_through_poses.xml').read_text(encoding='utf-8')
+    # Spin/BackUp/DriveOnHeading/Wait need behavior_server, whose motion would bypass the gate lease.
+    for forbidden in ('<Spin', '<BackUp', '<DriveOnHeading', '<Wait ', '<AssistedTeleop',
+                      'ControllerSelector', 'PlannerSelector'):
+        assert forbidden not in tree
+    assert '<RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.25"/>' in tree
 
 
 def test_each_motion_mode_launches_one_velocity_gate_and_no_direct_cmd_vel_remap():

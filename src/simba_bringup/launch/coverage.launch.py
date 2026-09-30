@@ -35,6 +35,8 @@ def _setup(context):
     settings = load_settings(config_dir, {'map_yaml': map_yaml, 'output_dir': output_dir, 'dock_file': ''})
     nav_dir = Path(tempfile.mkdtemp(prefix='simba-nav2-'))
     nav_file = settings.render_nav2(map_yaml, nav_dir, stamped_supported=stamped)
+    # An exported plan is driven with NavigateThroughPoses; bt_navigator publishes no velocity itself.
+    navigation = ['planner_server', 'controller_server'] + (['bt_navigator'] if plan else [])
     shared = {'config_dir': str(config_dir), 'map_yaml': str(Path(map_yaml).resolve()),
               'output_dir': str(Path(output_dir).resolve()), 'dock_file': '',
               'approved_hash': approved_hash}
@@ -47,11 +49,15 @@ def _setup(context):
         _node('nav2_planner', 'planner_server', 'planner_server', parameters=[str(nav_file)]),
         _node('nav2_controller', 'controller_server', 'controller_server', parameters=[str(nav_file)],
               remappings=CONTROLLER_REMAPS),
+    ]
+    if plan:
+        nodes.append(_node('nav2_bt_navigator', 'bt_navigator', 'bt_navigator', parameters=[str(nav_file)]))
+    nodes += [
         _node('nav2_lifecycle_manager', 'lifecycle_manager', 'lifecycle_manager_localization',
               parameters=[{'autostart': True, 'use_sim_time': False, 'node_names': ['map_server', 'amcl']}]),
         _node('nav2_lifecycle_manager', 'lifecycle_manager', 'lifecycle_manager_navigation',
               parameters=[{'autostart': True, 'use_sim_time': False,
-                           'node_names': ['planner_server', 'controller_server']}]),
+                           'node_names': navigation}]),
         _node('simba_coverage', 'coverage_supervisor', 'coverage_supervisor',
               parameters=[{**shared, 'plan_file': str(Path(plan).resolve()) if plan else ''}]),
         _node('simba_coverage', 'coverage_meter', 'coverage_meter', parameters=[shared]),
