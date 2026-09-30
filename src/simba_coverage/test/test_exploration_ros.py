@@ -254,3 +254,102 @@ def test_startup_reports_gate_fault_instead_of_graph_settling(exploration_ros):
     assert observation.sensor_reason != 'GRAPH_SETTLING'
     coordinator.policy.tick(observation)
     assert coordinator.policy.reason == 'WHEELS_DISABLED'
+
+
+def test_native_terminal_status_reconciles_only_matching_goal(exploration_ros):
+    from action_msgs.msg import GoalStatus, GoalStatusArray
+    from unique_identifier_msgs.msg import UUID
+    from types import SimpleNamespace
+    from simba_bringup.exploration import approaches
+    _, pump, _, _, coordinator, fake, _ = exploration_ros
+    pump(2.5)
+    coordinator.policy.docked_pose = tuple(coordinator.pose)
+    coordinator.policy.candidates = approaches(coordinator.pose, coordinator.profile['approach_offsets_m'])
+    coordinator.policy.home = coordinator.policy.candidates[0]
+    coordinator.policy.change('UNDOCK', time.monotonic())
+    goal_id = UUID(uuid=[1]*16)
+    record = {'name': '/undock', 'handle': SimpleNamespace(goal_id=goal_id),
+              'key': coordinator.mission.action_id(), 'canceled': False,
+              'sent': time.monotonic(), 'cancel_at': None, 'cancel_rejected': False}
+    coordinator.slot.records.append(record)
+    status = GoalStatus()
+    status.goal_info.goal_id = UUID(uuid=[2]*16)
+    status.status = GoalStatus.STATUS_SUCCEEDED
+    coordinator.receive_native_status('/undock', GoalStatusArray(status_list=[status]))
+    assert 'native_terminal' not in record
+    status.goal_info.goal_id = goal_id
+    coordinator.receive_native_status('/undock', GoalStatusArray(status_list=[status]))
+    observation = coordinator.observation()
+    observation.docked = None
+    coordinator.reconcile_native_terminal(observation)
+    assert not coordinator.slot.idle  # Missing dock status cannot authorize handoff.
+    observation.docked = False
+    observation.stopped = False
+    coordinator.reconcile_native_terminal(observation)
+    assert not coordinator.slot.idle
+    observation.stopped = True
+    coordinator.reconcile_native_terminal(observation)
+    assert coordinator.slot.idle
+    coordinator.process_results(observation)
+    assert coordinator.policy.subphase == 'UNDOCK_CONFIRM'
+    coordinator.policy.tick(observation)
+    assert coordinator.policy.phase == 'MANUAL' and coordinator.policy.home_valid
+    coordinator.slot.finish(record, 4, Undock.Result(is_docked=False))
+    assert not coordinator.slot.events  # A late GetResult cannot complete twice.
+
+
+def test_cancel_request_is_sent_once_even_with_late_acceptance():
+    from types import SimpleNamespace
+    from rclpy.task import Future
+    from simba_coverage.ros_common import ActionSlot
+    from simba_coverage.state import Mission
+    mission = Mission()
+    slot = ActionSlot(SimpleNamespace(), mission)
+    sent = []
+    def cancel():
+        sent.append(True)
+        return Future()
+    record = {'key':mission.action_id(), 'name':'/undock', 'handle':None,
+              'canceled':False, 'cancel_at':None, 'cancel_sent':False, 'cancel_rejected':False}
+    slot.records.append(record)
+    slot.cancel_record(record)
+    deadline = record['cancel_at']
+    record['handle'] = SimpleNamespace(cancel_goal_async=cancel)
+    slot.cancel_record(record)
+    slot.cancel_record(record)
+    assert len(sent) == 1 and record['cancel_at'] == deadline
+
+
+def test_manual_heartbeat_continues_while_service_reply_is_delayed():
+    import threading
+    from std_msgs.msg import Empty
+    from simba_bringup.exploration_teleop import ExplorationTeleop
+    from simba_coverage.ros_common import json_msg
+    rclpy.init(args=[])
+    server = Node('slow_manual_grant_server')
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(server)
+    heartbeats = []
+    server.create_subscription(Empty, '/control/manual_heartbeat', lambda _: heartbeats.append(time.monotonic()), 10)
+    def grant(request, response):
+        time.sleep(.7)
+        response.success = True
+        return response
+    server.create_service(SetBool, '/test/manual_grant', grant, callback_group=ReentrantCallbackGroup())
+    thread = threading.Thread(target=executor.spin, daemon=True)
+    thread.start()
+    ui = ExplorationTeleop(None)
+    ui.manual = ui.create_client(SetBool, '/test/manual_grant')
+    stamp = ui.get_clock().now().to_msg()
+    ui.receive_state(json_msg({'session_id':'test', 'sequence':1, 'stamp':{'sec':stamp.sec,'nanosec':stamp.nanosec},
+                              'phase':'MANUAL', 'subphase':'', 'reason':'', 'owner':'NONE'}))
+    try:
+        ui.request_manual(True)
+        assert len(heartbeats) >= 4 and ui.manual_requested and not ui.granted
+        assert max(b-a for a,b in zip(heartbeats,heartbeats[1:])) < .3
+    finally:
+        ui.destroy_node()
+        executor.shutdown()
+        thread.join(timeout=2.)
+        server.destroy_node()
+        rclpy.shutdown()

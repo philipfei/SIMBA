@@ -6,7 +6,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from rclpy.signals import SignalHandlerOptions
-from action_msgs.msg import GoalStatus
+from action_msgs.msg import GoalStatus, GoalStatusArray
 from geometry_msgs.msg import PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path
 from nav2_msgs.msg import Costmap
@@ -111,6 +111,9 @@ class ExplorationCoordinator(Node):
         self.create_subscription(OccupancyGrid, '/map', self.receive_map, LATCHED)
         self.create_subscription(Costmap, '/global_costmap/costmap_raw', self.receive_global, LATCHED)
         self.create_subscription(Costmap, '/local_costmap/costmap_raw', self.receive_local, LATCHED)
+        for action_name in ('/undock', '/dock'):
+            self.create_subscription(GoalStatusArray, action_name + '/_action/status',
+                lambda message, name=action_name: self.receive_native_status(name, message), LATCHED)
         self.create_subscription(String, '/safety/state', self.receive_gate, LATEST)
         self.create_subscription(Empty, '/control/manual_heartbeat', self.manual_heartbeat, 10)
         self.create_service(SetBool, '/control/manual', self.manual_service)
@@ -306,6 +309,32 @@ class ExplorationCoordinator(Node):
         return all(self.grid.segment_safe(a[:2], b[:2], self.settings.collision) and
                    self.global_grid.segment_safe(a[:2], b[:2], 1e-9) for a, b in segments)
 
+    def receive_native_status(self, name, message):
+        # Never use another goal's latched status as proof of completion.
+        for record in self.slot.records:
+            handle = record['handle']
+            if record['name'] != name or handle is None:
+                continue
+            for status in message.status_list:
+                if bytes(status.goal_info.goal_id.uuid) == bytes(handle.goal_id.uuid) and status.status in (
+                    GoalStatus.STATUS_SUCCEEDED, GoalStatus.STATUS_CANCELED, GoalStatus.STATUS_ABORTED):
+                    record['native_terminal'] = status.status
+
+    def reconcile_native_terminal(self, obs):
+        # Create 3 I.0.0 can publish a terminal status while GetResult hangs.
+        # Only native actions have the simple dock-status result used here.
+        for record in list(self.slot.records):
+            status = record.get('native_terminal')
+            if status is None:
+                continue
+            if record['canceled'] or status != GoalStatus.STATUS_SUCCEEDED:
+                self.slot.finish(record, status, error='NATIVE_TERMINAL_STATUS')
+            elif obs.docked is not None and obs.stopped and not obs.sensor_reason:
+                typ = Undock if record['name'] == '/undock' else Dock
+                self.get_logger().warning('Native completion confirmed by matching goal terminal status, '
+                    'fresh dock status and stopped odometry: ' + record['name'])
+                self.slot.finish(record, status, typ.Result(is_docked=obs.docked))
+
     def process_results(self, obs):
         while self.slot.events:
             name, status, result, error = self.slot.events.pop(0)
@@ -389,6 +418,8 @@ class ExplorationCoordinator(Node):
         now = time.monotonic()
         self.update_pose(now)
         obs = self.observation()
+        self.reconcile_native_terminal(obs)
+        obs.slot_idle = self.slot.idle
         # Policy reacts to current TF/safety before consuming an action success.
         self.policy.tick(obs, self.recovery.total)
         if self.policy.phase == 'FOLLOW' and self.pose is not None:

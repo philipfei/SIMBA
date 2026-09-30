@@ -134,7 +134,7 @@ class ActionSlot:
         if self.records:raise RuntimeError('Previous action has not terminated')
         client=self.client(typ,name)
         if not client.server_is_ready():raise RuntimeError(name+' server unavailable')
-        record={'key':self.mission.action_id(),'name':name,'handle':None,'canceled':False,'cancel_rejected':False,
+        record={'key':self.mission.action_id(),'name':name,'handle':None,'canceled':False,'cancel_rejected':False,'cancel_sent':False,
                 'sent':time.monotonic(),'cancel_at':None}
         self.records.append(record)
         try:future=client.send_goal_async(goal)
@@ -143,7 +143,8 @@ class ActionSlot:
         future.add_done_callback(lambda f:self.accepted(record,f))
 
     def finish(self,r,status,result=None,error=''):
-        if r in self.records:self.records.remove(r)
+        if r not in self.records:return
+        self.records.remove(r)
         if not r['canceled'] and self.mission.current(r['key']):
             self.events.append((r['name'],status,result,error))
 
@@ -163,7 +164,8 @@ class ActionSlot:
     def cancel_record(self,r):
         r['canceled']=True
         if r['cancel_at'] is None:r['cancel_at']=time.monotonic()
-        if r['handle'] is not None:
+        if r['handle'] is not None and not r['cancel_sent']:
+            r['cancel_sent']=True
             try:
                 future=r['handle'].cancel_goal_async()
                 def canceled(f):

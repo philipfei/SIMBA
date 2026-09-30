@@ -11,7 +11,7 @@ import time
 import tty
 import rclpy
 from rclpy.signals import SignalHandlerOptions
-from std_msgs.msg import String
+from std_msgs.msg import String, Empty
 from std_srvs.srv import Trigger
 from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from .keyboard_teleop import KeyboardTeleop
@@ -33,12 +33,28 @@ class ExplorationTeleop(KeyboardTeleop):
     def __init__(self, config_dir):
         super().__init__(config_dir)
         self.granted = False
+        self.manual_requested = False
         self.state = {}
         self.received = 0.
         self.last_printed = None
         self.return_home = self.create_client(Trigger, '/exploration/return_home')
         self.cancel = self.create_client(Trigger, '/exploration/cancel')
         self.create_subscription(String, '/exploration/state', self.receive_state, LATCHED)
+        self.create_timer(0.1, self.lease_heartbeat)
+
+    def lease_heartbeat(self):
+        # ROS timers also run while waiting for a service/grant acknowledgement.
+        if self.manual_requested and self.fresh() and self.state.get('phase') == 'MANUAL':
+            self.heartbeat.publish(Empty())
+            self.last_heartbeat = time.monotonic()
+
+    def request_manual(self, enabled):
+        self.manual_requested = enabled
+        try:
+            super().request_manual(enabled)
+        except Exception:
+            self.manual_requested = False
+            raise
 
     def receive_state(self, message):
         try:
@@ -86,7 +102,7 @@ class ExplorationTeleop(KeyboardTeleop):
 
     def release(self):
         self.command = None
-        if self.granted:
+        if self.granted or self.manual_requested:
             self.stop()
             self.request_manual(False)
             self.granted = False
@@ -117,6 +133,9 @@ class ExplorationTeleop(KeyboardTeleop):
                     raise RuntimeError('Manual gate acknowledgement timed out; no movement sent')
                 self.granted = True
             self.set_key(key.lower())
+        elif action == 'ignore' and key.lower() in ('w', 'a', 's', 'd'):
+            display('\r\nMovement requires MANUAL; current phase: ' + self.state['phase'] +
+                    ' / ' + self.state.get('subphase', '') + ' / ' + self.state.get('reason', ''), flush=True)
         elif action == 'busy':
             display('\r\nReturn unavailable in this phase; H is not queued.', flush=True)
 

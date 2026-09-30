@@ -272,3 +272,17 @@ from simba_bringup.exploration_teleop import ExplorationTeleop
 '''
     result = subprocess.run([sys.executable, '-c', script], capture_output=True, text=True, timeout=10.)
     assert result.returncode == 0, result.stderr
+
+
+def test_repeated_cancel_preserves_cause_and_deadline():
+    policy = ready_manual()
+    policy.change('UNDOCK', 3.)
+    policy.home_valid = False
+    policy.cancel(observe(policy, 4.))
+    cause, deadline, effects = policy.reason, policy.since, list(policy.effects)
+    policy.cancel(observe(policy, 5.5))
+    assert (policy.reason, policy.since, policy.effects) == (cause, deadline, effects)
+    policy.tick(observe(policy, 6.1, slot_idle=False))
+    assert policy.reason == 'CANCEL_STOP_UNCONFIRMED'
+    policy.cancel(observe(policy, 7.))
+    assert policy.reason == 'CANCEL_STOP_UNCONFIRMED' and policy.since == deadline

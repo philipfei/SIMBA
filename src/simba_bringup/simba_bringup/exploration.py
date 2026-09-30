@@ -238,6 +238,8 @@ class Exploration:
     def cancel(self, obs, failure=''):
         if self.phase == 'DOCKED':
             return
+        if self.subphase == 'CANCEL':
+            return  # Preserve the first cause and original cancellation deadline.
         self.auto = False
         self.manual = False
         if self.phase == 'UNDOCK' or self.subphase == 'UNDOCK_ARM':
