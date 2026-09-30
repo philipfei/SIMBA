@@ -3,7 +3,7 @@
     geometry:
       body_radius_m: 0.18
       planning_padding_m: 0.02
-      coverage_disk_radius_m: 0.25
+      coverage_disk_radius_m: 0.4
     motion:
       linear_m_s: 0.12
       angular_rad_s: 0.4

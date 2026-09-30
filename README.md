@@ -310,7 +310,7 @@ ros2 service call /coverage/start std_srvs/srv/Trigger '{}'
 
 Check that `preview_ready` is `true` before calling start. If it is `false`, the `reason` field names the problem (for example `PLAN_TOO_CLOSE_TO_OBSTACLES` or `PLAN_MAP_MISMATCH`). RViz shows the loaded plan on `/coverage/route`. `pause`, `resume` and `cancel` work as in fixed-map coverage.
 
-When the last pose is reached, the task finishes with reason `PLAN_COMPLETE`. If a validated dock calibration exists, the robot then returns and docks; otherwise it stops where the plan ends. Low battery without a dock calibration pauses the task. The coverage percentage reported by the meter uses SIMBA's 0.25 m coverage disk, so it can be lower than the tool's estimate; it does not decide when the plan ends. The task report in `output_dir` records `plan_file` and `plan_sha256`.
+When the last pose is reached, the task finishes with reason `PLAN_COMPLETE`. If a validated dock calibration exists, the robot then returns and docks; otherwise it stops where the plan ends. Low battery without a dock calibration pauses the task. The coverage percentage reported by the meter uses SIMBA's coverage disk (`coverage_disk_radius_m`, 0.4 m, the same as coverage_tool's default); it does not decide when the plan ends. The task report in `output_dir` records `plan_file` and `plan_sha256`.
 
 ## Dock and Undock
 
