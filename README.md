@@ -1,6 +1,6 @@
 # SIMBA
 
-SIMBA is a ROS 2 Jazzy workspace for an iRobot Create 3 with an RPLIDAR A2M8. It provides manual driving, SLAM, fixed-map coverage planning, runtime coverage measurement, safety-gated velocity ownership, and PC RViz visualization. Starting a launch file never starts robot motion.
+SIMBA is a ROS 2 Jazzy workspace for an iRobot Create 3 with an RPLIDAR A2M8. It provides manual driving, SLAM, fixed-map coverage planning, driving coverage plans made on the PC with Nav2, runtime coverage measurement, safety-gated velocity ownership, PC RViz visualization, and a closed-loop simulation for testing without the robot. Starting a launch file never starts robot motion.
 
 ## Repository layout
 
@@ -10,6 +10,9 @@ SIMBA/
 |-- LICENSE                           Apache-2.0 license
 |-- requirements.yaml                 Required Ubuntu and ROS packages
 |-- .env.local                        Tracked DDS settings for both PC and Pi hosts
+|-- tools/
+|   |-- coverage_tool/                 PC desktop planner: coverage path on a saved map, exported as a plan .yaml
+|   `-- sim/                           Closed-loop simulation: real SIMBA/Nav2 stack with a fake Create 3 and LiDAR
 `-- src/
     |-- simba_bringup/                 Hardware, launch, teleop, TF, and RViz package
     |   |-- config/
@@ -82,7 +85,22 @@ colcon build --symlink-install
 source install/setup.bash
 ```
 
-For Daniel's current checkout, the first command is `cd /home/daniel/NerdShit/JIP/SIMBA`. A `Summary: 0 packages finished` result means either `colcon` ran outside the SIMBA root or the Colcon discovery extensions are missing. `colcon list` must show both SIMBA packages before building. The Pi installs `rplidar_ros` from apt; it is not a third workspace package.
+On the PC, `rosdep` does not install everything in `requirements.yaml` (for example `ros-jazzy-rviz2`, `python3-matplotlib`, `python3-scipy`, `python3-tk` for coverage_tool). Install the `pc` lists of `requirements.yaml` with `apt` as well.
+
+A `Summary: 0 packages finished` result means either `colcon` ran outside the SIMBA root or the Colcon discovery extensions are missing. `colcon list` must show both SIMBA packages before building. The Pi installs `rplidar_ros` from apt; it is not a third workspace package.
+
+### Tests
+
+On the PC, after building:
+
+```bash
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+python3 -m pytest -q src/simba_coverage/test
+python3 tools/coverage_tool/tests/regression.py
+```
+
+`test_ros.py` starts real ROS nodes on loopback (domain 91) with CycloneDDS, so it needs `ros-jazzy-rmw-cyclonedds-cpp` and `ros-jazzy-irobot-create-msgs`. It is skipped when they are missing. Its fake robot jumps between poses, so on a busy PC about one full run in three has one test fail with `TF_UNAVAILABLE`, `LOCALIZATION_SETTLING` or `PHASE_WAIT`. Run that test again on its own (`-k <name>`) before treating it as a real failure. Behaviour on the robot map with the full Nav2 stack is checked with `tools/sim` (see its README).
 
 ## DDS environment
 
@@ -92,7 +110,7 @@ DDS settings are required **before starting any ROS process that communicates be
 - PC keyboard teleop, RViz, robot topics/services/actions, and live diagnostics: load it.
 - PC-only build, unit tests, Git operations, and offline coverage preview from a saved map: it is not required.
 
-The tracked `.env.local` selects `eth0+wlan0` when the hostname is `create3-pi`; every other host uses the verified PC adapter `enx00e17c6840b1`. Philip's and Daniel's PCs use the same adapter name. Verify after hardware or hostname changes:
+The tracked `.env.local` selects `eth0+wlan0` when the hostname is `create3-pi`; every other host uses the verified PC adapter `enx00e17c6840b1` (the USB Ethernet adapter the team's PCs share). **A PC with a different adapter cannot talk to the robot until its name is in `.env.local`**: find it with `ip -br address` and add a hostname case for that PC. `/path/to/SIMBA` in the commands below stands for your clone. Verify after hardware or hostname changes:
 
 ```bash
 hostname -s
@@ -107,8 +125,8 @@ PC:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/philip/Documents/SIMBA/.env.local
-source /home/philip/Documents/SIMBA/install/setup.bash
+source /path/to/SIMBA/.env.local
+source /path/to/SIMBA/install/setup.bash
 ```
 
 Pi:
@@ -166,9 +184,9 @@ PC terminal:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/philip/Documents/SIMBA/.env.local
-source /home/philip/Documents/SIMBA/install/setup.bash
-ros2 run simba_bringup keyboard_teleop --config-dir /home/philip/Documents/SIMBA/src/simba_bringup/config
+source /path/to/SIMBA/.env.local
+source /path/to/SIMBA/install/setup.bash
+ros2 run simba_bringup keyboard_teleop --config-dir /path/to/SIMBA/src/simba_bringup/config
 ```
 
 Keys: `W/S/A/D` move, `X` or Space stops, and `Q` stops, releases ownership, and exits. Do not add backslashes before underscores or `--config-dir`.
@@ -203,8 +221,8 @@ PC RViz terminal:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/philip/Documents/SIMBA/.env.local
-source /home/philip/Documents/SIMBA/install/setup.bash
+source /path/to/SIMBA/.env.local
+source /path/to/SIMBA/install/setup.bash
 ros2 launch simba_bringup rviz.launch.py mode:=slam
 ```
 
@@ -222,7 +240,7 @@ ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGrap
 Copy it to the PC:
 
 ```bash
-scp -o HostKeyAlias=create3-pi.local -r create3-pi@create3-pi.local:/home/create3-pi/SIMBA/maps/ROOM_NAME /home/philip/Documents/SIMBA/maps/
+scp -o HostKeyAlias=create3-pi.local -r create3-pi@create3-pi.local:/home/create3-pi/SIMBA/maps/ROOM_NAME /path/to/SIMBA/maps/
 ```
 
 ## Offline coverage preview
@@ -230,10 +248,10 @@ scp -o HostKeyAlias=create3-pi.local -r create3-pi@create3-pi.local:/home/create
 This is a static geometric estimate, not a closed-loop simulation. DDS is not required.
 
 ```bash
-cd /home/philip/Documents/SIMBA
+cd /path/to/SIMBA
 source /opt/ros/jazzy/setup.bash
-source /home/philip/Documents/SIMBA/install/setup.bash
-ros2 run simba_coverage coverage_preview --map /home/philip/Documents/SIMBA/maps/room_20260923_1338/map.yaml --config-dir /home/philip/Documents/SIMBA/src/simba_bringup/config --output /home/philip/Documents/SIMBA/output/preview-review
+source /path/to/SIMBA/install/setup.bash
+ros2 run simba_coverage coverage_preview --map /path/to/SIMBA/maps/room_20260923_1338/map.yaml --config-dir /path/to/SIMBA/src/simba_bringup/config --output /path/to/SIMBA/output/preview-review
 ```
 
 Review `preview.png`, `summary.json`, `candidates.json`, `route.json`, and `approval_manifest.json`. Any effective configuration or map change requires a new preview and approval hash.
@@ -254,8 +272,8 @@ PC RViz:
 
 ```bash
 source /opt/ros/jazzy/setup.bash
-source /home/philip/Documents/SIMBA/.env.local
-source /home/philip/Documents/SIMBA/install/setup.bash
+source /path/to/SIMBA/.env.local
+source /path/to/SIMBA/install/setup.bash
 ros2 launch simba_bringup rviz.launch.py mode:=coverage
 ```
 
@@ -290,7 +308,21 @@ The plan must be made on the same map that the Pi loads, with **robot radius at 
 
 The tracked plan `tools/coverage_tool/examples/map_ME_room1v4_coveragev3.yaml` was made this way for `map_ME_room1v4.yaml`. It starts at x=-0.04, y=1.23.
 
-Update and build the Pi first (see *Git deployment to the Pi*, using this branch if it is not merged into `main` yet). Then, in a Pi terminal inside tmux:
+Workflow for your own room:
+
+1. Make a map with *SLAM with RViz and teleoperation* and save it (`.yaml` + `.pgm`).
+2. On the PC, plan in `tools/coverage_tool` (see its README). Keep the robot radius at 0.23 m or more (the default) and export the plan `.yaml`.
+3. Try the plan without the robot in the closed-loop simulation:
+   ```bash
+   cd /path/to/SIMBA && source tools/sim/env.sh && cd tools/sim
+   python3 run_sim.py myroom --map /path/to/map.yaml --plan /path/to/plan.yaml --start X Y YAW
+   python3 analyze.py runs/myroom
+   ```
+   See `tools/sim/README.md`. Check that it reaches `PLAN_COMPLETE` without bumps, and look at the coverage map.
+4. Copy the map (`.yaml` + `.pgm`) and the plan to the Pi, for example with `scp` to `/home/create3-pi/SIMBA/maps/`. That folder is not tracked by Git. The plan is checked against the map image, so copy the exact files.
+5. Launch and start as below.
+
+Update and build the Pi first (see *Git deployment to the Pi*). Then, in a Pi terminal inside tmux:
 
 ```bash
 tmux new -s simba-plan
@@ -300,7 +332,7 @@ source /home/create3-pi/SIMBA/install/setup.bash
 ros2 launch simba_bringup coverage.launch.py config_dir:=/home/create3-pi/SIMBA/src/simba_bringup/config map:=/home/create3-pi/SIMBA/tools/coverage_tool/examples/map_ME_room1v4.yaml plan:=/home/create3-pi/SIMBA/tools/coverage_tool/examples/map_ME_room1v4_coveragev3.yaml output_dir:=/home/create3-pi/SIMBA/output
 ```
 
-Place the robot undocked, anywhere in the room. It does not have to be at the plan start: the supervisor first drives to it. Start RViz on the PC with `mode:=coverage`, set the initial pose, and wait until `/coverage/state` reports `"trusted": true`. Then:
+Place the robot undocked, anywhere in the room. It does not have to be at the plan start: the supervisor first drives to it. Start RViz on the PC with `mode:=coverage`, set the initial pose, and wait until `/coverage/state` reports `"trusted": true`. Give AMCL another 20–30 s standing still, until the position variance in `/amcl_pose` (covariance entries 0 and 7) is below about 0.001 m² (σ ≈ 3 cm). Every turn on the spot raises it, and above σ 0.1 m the supervisor pauses with `POSITION_UNCERTAIN`. Then:
 
 ```bash
 ros2 service call /coverage/preview std_srvs/srv/Trigger '{}'
@@ -311,6 +343,27 @@ ros2 service call /coverage/start std_srvs/srv/Trigger '{}'
 Check that `preview_ready` is `true` before calling start. If it is `false`, the `reason` field names the problem (for example `PLAN_TOO_CLOSE_TO_OBSTACLES` or `PLAN_MAP_MISMATCH`). RViz shows the loaded plan on `/coverage/route`. `pause`, `resume` and `cancel` work as in fixed-map coverage.
 
 When the last pose is reached, the task finishes with reason `PLAN_COMPLETE`. If a validated dock calibration exists, the robot then returns and docks; otherwise it stops where the plan ends. Low battery without a dock calibration pauses the task. The coverage percentage reported by the meter uses SIMBA's coverage disk (`coverage_disk_radius_m`, 0.4 m, the same as coverage_tool's default); it does not decide when the plan ends. The task report in `output_dir` records `plan_file` and `plan_sha256`.
+
+### First run on the robot
+
+Check these the first time, and after Nav2 or configuration changes. Keep a hand on the Create 3's stop button.
+
+1. `ros2 lifecycle get /bt_navigator` reports `active`, and `ros2 action list` shows `/navigate_through_poses`.
+2. `ros2 topic info -v /odom`: Nav2's controller and `bt_navigator` subscribe RELIABLE. If the Create 3 publishes best-effort, Nav2 receives no odometry.
+3. Turn the robot on the spot with teleop and watch `/amcl_pose`:
+   - the position σ (square root of covariance entries 0 and 7) must stay below 0.1 m;
+   - messages must keep coming while the robot moves slowly.
+   
+   The AMCL values in `nav2_params.yaml` (`alpha1`–`alpha5` 0.05, `update_min_d` 0.025, `update_min_a` 0.05) and `nomotion_update_period_s` 0.5 were tuned in simulation only. Raise the alphas if AMCL loses the pose on the real robot.
+4. Run a short plan first. Then put a box or a person in the path of the plan and check that the robot goes around or stops, and that the gate reports `OBJECT_PROXIMITY` or `BUMP`.
+5. After the run, read `temporary_blockages` in the task report. Many `PLAN_POSE_SKIPPED` entries in one place point at a plan that is too tight there.
+
+### Known limitations
+
+- **Obstacle on a plan pose.** An obstacle that sits *on* a plan pose can be driven into. The pose inside it is not a lethal cell (the LiDAR only sees its front), so NavFn may route in through the unseen side. The costmaps also ignore LiDAR hits closer than 0.2 m (`obstacle_min_range`). The Create 3's IR proximity sensors and bumper stop the robot, and the supervisor pauses after a repeated bump. Nav2 jazzy has no `RemoveInCollisionGoals` node; a costmap check in the supervisor would fix this.
+- **Hairpin tips.** Regulated Pure Pursuit aims 0.2 m ahead (`lookahead_dist`), so the robot turns before the tip of a hairpin. The pose there is then skipped after `plan_pose_timeout_s`, and a little floor near the tip is missed.
+- **Resume near walls.** Resume and the start of each chunk check that the robot is within `planner_start_tolerance_m` (0.15 m) of a safe cell. Close to a wall this can refuse with "Actual pose exceeds planner_start_tolerance_m". Move the robot away from the wall with teleop and resume.
+- **Simulation only.** The plan-driving behaviour (0.10 m radius, dropping passed poses, skipping) and the AMCL tuning have been validated in `tools/sim`, not yet on the robot.
 
 ## Dock and Undock
 

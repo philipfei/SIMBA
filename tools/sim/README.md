@@ -77,7 +77,7 @@ Key fields in `summary.json`:
 
 In the coverage map, green is covered, red is coverable but missed, and grey is free floor that no robot position can reach.
 
-Reference, with the defaults at the time of writing: the `clear` run finished the v3 plan in about 580 s with about 93 % meter coverage, one skipped pose and no bumps.
+Reference, with the repository defaults at the time of writing: the `clear` run finishes the v3 plan in 580–630 s with 93–94 % meter coverage and no bumps. One or two poses are skipped; one is the plan start, a hairpin tip for a robot arriving from the south (see *Known limitations* in the main README).
 
 ## Troubleshooting
 
