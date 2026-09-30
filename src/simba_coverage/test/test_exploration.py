@@ -254,3 +254,21 @@ def test_installed_launch_generates_live_profile(tmp_path, monkeypatch):
     assert 'amcl' not in nav and 'map_server' not in nav
     assert nav['global_costmap']['global_costmap']['ros__parameters']['rolling_window'] is False
     assert nav['controller_server']['ros__parameters']['goal_checker']['yaw_goal_tolerance'] == .05
+
+
+def test_pc_teleop_does_not_import_robot_action_messages():
+    pytest.importorskip('rclpy')
+    import subprocess
+    import sys
+    script = '''
+import importlib.abc
+import sys
+class NoRobotMessages(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname.split('.')[0] in ('irobot_create_msgs', 'nav2_msgs'):
+            raise ModuleNotFoundError(fullname)
+sys.meta_path.insert(0, NoRobotMessages())
+from simba_bringup.exploration_teleop import ExplorationTeleop
+'''
+    result = subprocess.run([sys.executable, '-c', script], capture_output=True, text=True, timeout=10.)
+    assert result.returncode == 0, result.stderr

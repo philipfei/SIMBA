@@ -1,4 +1,5 @@
 """Phase-aware extension of terminal teleop; manual velocity stays on the PC."""
+import json
 import os
 import select
 import signal
@@ -12,9 +13,12 @@ import rclpy
 from rclpy.signals import SignalHandlerOptions
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
-from simba_coverage.ros_common import LATCHED, decode, ros_now
+from rclpy.qos import QoSProfile, DurabilityPolicy, ReliabilityPolicy
 from .keyboard_teleop import KeyboardTeleop
 from .exploration import key_action
+
+LATCHED = QoSProfile(depth=1, durability=DurabilityPolicy.TRANSIENT_LOCAL,
+                     reliability=ReliabilityPolicy.RELIABLE)
 
 
 def display(*args, **kwargs):
@@ -38,7 +42,7 @@ class ExplorationTeleop(KeyboardTeleop):
 
     def receive_state(self, message):
         try:
-            state = decode(message)
+            state = json.loads(message.data)
             if self.state.get('session_id') == state['session_id'] and state['sequence'] <= self.state.get('sequence', -1):
                 return
             self.state = state
@@ -56,7 +60,7 @@ class ExplorationTeleop(KeyboardTeleop):
     def fresh(self):
         try:
             stamp = self.state['stamp']
-            age = ros_now(self) - stamp['sec'] - stamp['nanosec'] / 1e9
+            age = self.get_clock().now().nanoseconds / 1e9 - stamp['sec'] - stamp['nanosec'] / 1e9
             return -0.1 <= age <= 2.0 and time.monotonic() - self.received <= 2.0
         except (KeyError, TypeError):
             return False
