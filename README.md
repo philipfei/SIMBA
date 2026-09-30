@@ -340,7 +340,7 @@ RViz and teleop can attach after Undock: `/exploration/state`, `/exploration/hom
 
 ### Keys and handover
 
-Use **lowercase w/s/a/d** to drive. `H` returns home, `X` or Space stops/cancels, `Q` stops and exits, and **Shift+D** detaches the UI while allowing an autonomous return to continue. Uppercase D is reserved for detach because lowercase d already turns right. The original manual-mode key handling remains unchanged.
+Use **lowercase w/s/a/d** to drive. `H` returns home, `X` or Space stops/cancels, `Q` stops and exits, and **Shift+D** detaches the UI while allowing an autonomous return to continue. Uppercase D is reserved for detach because lowercase d already turns right. The original manual-mode key handling remains unchanged. The PC exploration UI uses only standard ROS messages/services and does not import Create 3 or Nav2 action messages; those are required by the Pi coordinator.
 
 Teleop requests and holds MANUAL through `/control/manual` and publishes `/cmd_vel_remote` itself. The Pi coordinator provides that service and arbitrates grants through the existing `/coverage/lease` and `/coverage/trust` internal channels. On H, teleop stops, releases MANUAL, waits for gate NONE, then requests return. Nav2 publishes `/cmd_vel_nav`; the gate remains the sole external `/cmd_vel` publisher. During native Dock/Undock, it stays silent.
 
@@ -409,6 +409,7 @@ ros2 topic echo /dock_status --once --full-length
 | DOCK_NOT_VISIBLE / DOCK_NOT_VISIBLE_OR_CLEAR | Check dock power and IR line of sight; reposition after X; H again. |
 | DOCK_FAILED / DOCK_STATUS_DISAGREEMENT / NATIVE_ACTION_TIMEOUT | Verify fresh dock status and physical position; do not assume action success means docked. |
 | ACTION_UNAVAILABLE / ACTION_ACCEPT_TIMEOUT | Restore the relevant native/Nav2 action server before retrying. |
+| Native status says SUCCEEDED but GetResult hangs | Stop the session and verify physical stopping. Check the robot application logs and native result service; an operator-authorized restart of the Create 3 application may restore the service. Recover to the dock and start a fresh SLAM session. Never treat dock status alone as action completion or increase safety deadlines to hide a missing result. |
 | CANCEL_STOP_UNCONFIRMED | Use physical stop. Resolve the outstanding native action and E-Stop latch before any movement. |
 | MANUAL_HEARTBEAT_LOST / stale PC status | Reconnect and read current phase; request manual control only when manual-ready. |
 | DOCKED | Normal terminal completion; relaunch from dock for another session. |
