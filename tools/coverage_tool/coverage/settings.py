@@ -5,7 +5,7 @@ import json
 
 DEFAULTS = {
     'geometry': {
-        'robot_radius_m': 0.2,           # keeps the robot centre this far from walls/obstacles
+        'robot_radius_m': 0.23,          # keeps the robot centre this far from walls/obstacles; SIMBA needs >= 0.23
         'coverage_disk_radius_m': 0.4,   # radius of the area the tool/sensor covers
     },
     'spiral': {
