@@ -241,3 +241,16 @@ def test_shutdown_signal_does_not_interrupt_executor_callback(monkeypatch, modul
         monkeypatch.setattr(module, '_stop_before_shutdown', lambda node: node.stop_before_shutdown())
     module.main()
     assert events == ['callback completed', 'stop', 'destroy', 'shutdown']
+
+
+def test_startup_reports_gate_fault_instead_of_graph_settling(exploration_ros):
+    _, pump, _, gate, coordinator, fake, _ = exploration_ros
+    pump(2.5)
+    fake.wheels = False
+    pump(.3)
+    coordinator.policy.auto = True
+    observation = coordinator.observation()
+    assert observation.gate_reason == 'WHEELS_DISABLED'
+    assert observation.sensor_reason != 'GRAPH_SETTLING'
+    coordinator.policy.tick(observation)
+    assert coordinator.policy.reason == 'WHEELS_DISABLED'

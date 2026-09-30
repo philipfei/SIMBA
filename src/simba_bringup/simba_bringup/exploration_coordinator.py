@@ -234,7 +234,7 @@ class ExplorationCoordinator(Node):
         else:
             self.graph_ready_since = None
         sensor_reason = self.inputs.reason()
-        if self.policy.phase == 'WAIT_READY' and self.policy.auto:
+        if self.policy.phase == 'WAIT_READY' and self.policy.auto and not reason:
             if not all(client.server_is_ready() for client in self.slot.clients.values()):
                 sensor_reason = sensor_reason or 'ACTION_SERVERS_NOT_READY'
             elif self.graph_ready_since is None or now - self.graph_ready_since < self.profile['settle_s']:
