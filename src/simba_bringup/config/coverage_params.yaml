@@ -6,6 +6,7 @@
       area_tie_tolerance_ratio: 0.001
       max_segment_length_m: 2.0
       through_poses_chunk_m: 6.0
+      through_poses_spacing_m: 0.1
       stationary_target_length_m: 0.01
       alignment: auto
       manual_angle_deg: 0.0
@@ -101,5 +102,12 @@
       movement_translation_m: 0.03
       movement_rotation_rad: 0.05
       bump_max_repeats: 1
+      plan_pose_near_m: 0.5
+      plan_pose_timeout_s: 12.0
+      plan_pose_turn_limit_rad: 4.7
+      plan_pass_lateral_m: 0.3
+      plan_pass_window_m: 1.0
+      plan_pass_min_distance_m: 0.1
+      plan_replace_period_s: 1.0
     visualization:
       period_s: 0.5

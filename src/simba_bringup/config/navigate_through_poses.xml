@@ -3,8 +3,9 @@
   navigate_through_poses_w_replanning_and_recovery.xml:
   - Replans through the remaining plan poses at 1 Hz so the global planner routes around
     obstacles that the costmaps pick up from the LiDAR.
-  - RemovePassedGoals radius is 0.25 m instead of 0.7 m: plan poses sit at every corner (often
-    only a few cm apart), and a large radius would drop them and cut the corners of the plan.
+  - RemovePassedGoals radius is 0.10 m instead of 0.7 m, so the robot has to drive through each plan pose
+    (coverage_supervisor sends one every 0.1 m). A pose the robot cannot reach is skipped by the
+    supervisor (plan_pose_timeout_s / plan_pose_turn_limit_rad), not by a larger radius here.
   - Controller, planner, goal and progress checker are fixed; no selector topics.
   - Recovery only clears the costmaps. There is no Spin, BackUp or Wait, so no behavior_server
     and no motion that bypasses the velocity gate. Retries and skipping a blocked pose are
@@ -17,7 +18,7 @@
         <RateController hz="1.0">
           <RecoveryNode number_of_retries="1" name="ComputePathThroughPoses">
             <ReactiveSequence>
-              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.25"/>
+              <RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.10"/>
               <ComputePathThroughPoses goals="{goals}" path="{path}" planner_id="GridBased" error_code_id="{compute_path_error_code}"/>
             </ReactiveSequence>
             <Sequence>

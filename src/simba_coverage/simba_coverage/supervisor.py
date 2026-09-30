@@ -23,7 +23,7 @@ from .geometry import Grid, validate_polygon, wrap
 from .planner import sweeps, ordered, gap_targets
 from .state import Mission
 from .params import node_settings, approval_manifest, canonical_hash
-from .planning import optimize, boundary_routes, connect, points_of, poly_target, split_path, trim_stripes, length
+from .planning import optimize, boundary_routes, connect, densify, points_of, poly_target, split_path, trim_stripes, length
 from .health import Trust
 from .plan_file import load_plan
 from .ros_common import (Inputs, ActionSlot, LATCHED, LATEST, parameter, decode, json_msg,
@@ -61,7 +61,7 @@ class Supervisor(Node):
         self.return_since=0.;self.round_start_area=0.;self.gain_area=0.;self.no_gain=0.;self.last_tick=time.monotonic()
         self.bump_since=None;self.bump_clear=None;self.bump_locations=[];self.before_bump=''
         self.pending_native=None;self.pending_phase=None;self.path=None;self.path_end_yaw=None;self.test_goal=None
-        self.through_points=[];self.through_remaining=0
+        self.through_points=[];self.through_remaining=0;self.pose_near_since=None;self.pose_turn=0.;self.pose_yaw=0.;self.last_replace=0.;self.chunk_started=False
         self.worker_pool=ThreadPoolExecutor(max_workers=1);self.work=None;self.work_kind='';self.work_key=None
         self.dock={};self.load_dock()
         self.lease_pub=self.create_publisher(String,'/coverage/lease',LATEST)
@@ -389,19 +389,77 @@ class Supervisor(Node):
 
     def through(self,points):
         # Nav2's bt_navigator replans through the remaining poses, so it drives to the chunk start and around obstacles.
+        # Dense poses leave the cost-aware planner no room to round the plan off near walls and corners.
+        points=densify(points,self.settings['planning']['through_poses_spacing_m'])
         goal=NavigateThroughPoses.Goal();goal.poses=path_msg(self,points).poses
         self.path=[list(p) for p in points];self.through_points=list(self.path);self.through_remaining=len(points)
+        self.pose_near_since=None;self.chunk_started=False
         self.mission.state='THROUGH';self.phase_since=time.monotonic();self.motion_pose=list(self.pose);self.last_motion=time.monotonic()
         self.slot.send(NavigateThroughPoses,'/navigate_through_poses',goal,self.through_feedback)
 
     def through_feedback(self,feedback):
         # RemovePassedGoals drops reached poses from the front, so the count identifies the next plan pose.
         remaining=int(feedback.number_of_poses_remaining)
-        if 0<remaining<self.through_remaining:self.through_remaining=remaining;self.target_since=time.monotonic()
+        if 0<remaining<self.through_remaining:
+            self.through_remaining=remaining;self.target_since=time.monotonic();self.pose_near_since=None;self.chunk_started=True
 
     def plan_rest(self):
         if not self.through_points:return points_of(self.current)
         return self.through_points[len(self.through_points)-self.through_remaining:]
+
+    def passed_poses(self):
+        """Leading poses of the remaining plan that the robot is already past.
+
+        RemovePassedGoals only drops a pose within its radius, so a pose passed just outside it would
+        pull the robot back. The robot is projected onto the next plan_pass_window_m of the plan (it must
+        be within plan_pass_lateral_m of it). A leading pose counts as passed when it lies behind that
+        projection and is farther than plan_pass_min_distance_m from the robot, the RemovePassedGoals
+        radius: closer poses Nav2 drops itself."""
+        # On the way to the chunk start the robot may pass close to a later part of the chunk; that is
+        # not progress along it. Only judge once a pose of this chunk has been reached.
+        if not self.chunk_started:return 0
+        r=self.settings['recovery'];rest=self.plan_rest();p=np.asarray(self.pose[:2]);best=None;along=[0.]
+        for i in range(len(rest)-1):
+            a=np.asarray(rest[i]);ab=np.asarray(rest[i+1])-a;n=float(ab@ab)
+            t=float(np.clip((p-a)@ab/n,0.,1.)) if n>1e-12 else 0.
+            d=float(np.linalg.norm(p-(a+t*ab)))
+            if best is None or d<best[0]-1e-9:best=(d,along[-1]+t*math.sqrt(n))
+            along.append(along[-1]+math.sqrt(n))
+            if along[-1]>=r['plan_pass_window_m']:break
+        if best is None or best[0]>r['plan_pass_lateral_m']:return 0
+        count=0
+        for s,xy in zip(along,rest):
+            if s>=best[1]-1e-9 or math.dist(p,xy)<=r['plan_pass_min_distance_m']:break
+            count+=1
+        return count
+
+    def replace_through(self,points):
+        # Preempt the running goal with the rest of the chunk: no stop, same lease epoch.
+        goal=NavigateThroughPoses.Goal();goal.poses=path_msg(self,points).poses
+        self.path=[list(p) for p in points];self.through_points=list(self.path);self.through_remaining=len(points)
+        self.current=poly_target(points,'plan');self.pose_near_since=None
+        self.target_since=self.last_replace=time.monotonic()
+        self.slot.replace(NavigateThroughPoses,'/navigate_through_poses',goal,self.through_feedback)
+
+    def pose_stuck(self,now):
+        """Next plan pose tried but not reached: timed out or turning on the spot once the robot is near it."""
+        r=self.settings['recovery'];target=self.plan_rest()[0]
+        if math.dist(self.pose[:2],target)>r['plan_pose_near_m']:self.pose_near_since=None;return ''
+        if self.pose_near_since is None:self.pose_near_since=now;self.pose_turn=0.;self.pose_yaw=self.pose[2];return ''
+        self.pose_turn+=abs(wrap(self.pose[2]-self.pose_yaw));self.pose_yaw=self.pose[2]
+        if now-self.pose_near_since>=r['plan_pose_timeout_s']:return 'POSE_TIMEOUT'
+        if self.pose_turn>=r['plan_pose_turn_limit_rad']:return 'POSE_TURNING'
+        return ''
+
+    def skip_pose(self,reason):
+        # Drop only this pose and continue with the next one in line, without stopping.
+        now=time.monotonic();rest=self.plan_rest();skipped=rest[0]
+        self.mission.blocked.append({'xy':list(skipped),'radius':0.,'reason':'PLAN_POSE_SKIPPED','cause':reason,'time':now})
+        self.mission.events.append({'time':now,'target':'pose:%.3f,%.3f'%tuple(skipped),'reason':reason,'skipped':True})
+        if rest[1:]:self.replace_through(rest[1:]);return
+        # The chunk's last pose: end this goal and start the next chunk.
+        self.slot.cancel();self.current=None;self.through_points=[];self.pose_near_since=None
+        self.mission.state='PREPARING';self.pending_phase='NEXT';self.phase_since=now
 
     def plan_failure(self,reason):
         # Retry from the next unreached pose; a pose that keeps failing is skipped with its surroundings.
@@ -580,6 +638,9 @@ class Supervisor(Node):
                 if fault:self.pause(fault)
                 elif not self.mission.coverage_finished and phase not in ('RETURN_PLAN','RETURN','DOCK_WAIT','DOCK','TEST_PLAN','TEST','DOCK_CONFIRM') and self.inputs.messages['battery_state'].percentage<=self.settings['battery']['return_ratio']:
                     self.slot.cancel();self.mission.coverage_finished=True;self.mission.state='PREPARING';self.pending_phase='RETURN';self.phase_since=now;self.mission.reason='LOW_BATTERY_RETURN'
+                elif phase=='THROUGH' and now-self.last_replace>=self.settings['recovery']['plan_replace_period_s'] and (passed:=self.passed_poses()):
+                    self.replace_through(self.plan_rest()[passed:])
+                elif phase=='THROUGH' and (stuck:=self.pose_stuck(now)):self.skip_pose(stuck)
                 elif phase in ('CONNECT','SWEEP','THROUGH','CONNECT_PLAN') and now-self.target_since>=self.settings['deadlines']['target_s']:self.target_failure('TARGET_TIMEOUT')
                 elif phase in ('RETURN_PLAN','RETURN') and now-self.return_since>=self.settings['deadlines']['return_s']:self.pause('RETURN_TIMEOUT')
                 elif phase in ('UNDOCK','DOCK') and now>=self.native_deadline:self.pause('NATIVE_ACTION_TIMEOUT')

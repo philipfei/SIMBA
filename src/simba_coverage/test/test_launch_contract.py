@@ -40,7 +40,7 @@ def test_navigate_through_poses_tree_has_no_motion_behaviors():
     for forbidden in ('<Spin', '<BackUp', '<DriveOnHeading', '<Wait ', '<AssistedTeleop',
                       'ControllerSelector', 'PlannerSelector'):
         assert forbidden not in tree
-    assert '<RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.25"/>' in tree
+    assert '<RemovePassedGoals input_goals="{goals}" output_goals="{goals}" radius="0.10"/>' in tree
 
 
 def test_each_motion_mode_launches_one_velocity_gate_and_no_direct_cmd_vel_remap():

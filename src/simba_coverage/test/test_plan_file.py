@@ -45,3 +45,13 @@ def test_plan_from_another_map_or_frame_is_rejected(tmp_path,room_map):
         load_plan(write_plan(tmp_path,[[1.,1.],[2.,1.]],frame_id='odom'),grid,room_map,'map',.2,1.)
     with pytest.raises(ValueError,match='fewer than two'):
         load_plan(write_plan(tmp_path,[[1.,1.]]),grid,room_map,'map',.2,1.)
+
+
+def test_densify_keeps_every_vertex_and_bounds_spacing():
+    from simba_coverage.planning import densify
+    points=[[0.,0.],[.25,0.],[.25,.05],[1.,.05]]
+    dense=densify(points,.1)
+    gaps=np.linalg.norm(np.diff(dense,axis=0),axis=1)
+    assert all(any(np.allclose(p,q) for q in dense) for p in points) and np.allclose(dense[-1],points[-1])
+    assert gaps.max()<=.1+1e-9 and gaps.min()>0 and len(dense)==1+3+1+8
+    assert densify(dense,.1)==dense  # A retry re-densifies the unreached rest.

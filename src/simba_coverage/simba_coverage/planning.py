@@ -31,6 +31,15 @@ def poly_target(points,kind='sweep'):
 def points_of(t):return getattr(t,'points',None) or [t.start,t.end]
 
 
+def densify(points,spacing):
+    """Points at least every `spacing` metres along the polyline, keeping every vertex."""
+    out=[list(points[0])]
+    for a,b in zip(points,points[1:]):
+        n=max(1,math.ceil(math.dist(a,b)/spacing-1e-6))  # Tolerance: densifying twice must not add points.
+        out.extend((np.asarray(a,float)+(np.asarray(b,float)-a)*i/n).tolist() for i in range(1,n+1))
+    return out
+
+
 def split_path(points,maximum,kind):
     # Nav2's endpoint goal checker can accept a closed loop without traversing it.
     # Split at a distinct point before applying the ordinary length limit.
