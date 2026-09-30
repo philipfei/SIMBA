@@ -204,3 +204,14 @@ def test_closed_terminal_output_does_not_interrupt_cleanup(monkeypatch):
         raise OSError('Terminal closed')
     monkeypatch.setattr('builtins.print', closed)
     display('Cleanup still proceeds', flush=True)
+
+
+def test_launch_preflight_with_only_private_context():
+    """Launch has no default rclpy context; preflight must own its executor."""
+    import subprocess
+    import sys
+    result = subprocess.run([sys.executable, '-c',
+        'from simba_bringup.mode_guard import preflight; preflight(None)'],
+        capture_output=True, text=True, timeout=10.)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert 'Exception ignored' not in result.stderr

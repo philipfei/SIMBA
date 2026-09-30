@@ -34,15 +34,19 @@ def preflight(_launch_context, *args, **kwargs):
     import rclpy
     from rclpy.context import Context
     from rclpy.node import Node
+    from rclpy.executors import SingleThreadedExecutor
     descriptor = acquire_lock()
     context = Context()
     node = None
+    executor = None
     try:
         rclpy.init(args=[], context=context)
         node = Node('simba_launch_preflight', context=context)
+        executor = SingleThreadedExecutor(context=context)
+        executor.add_node(node)
         deadline = time.monotonic() + 2.0
         while time.monotonic() < deadline:
-            rclpy.spin_once(node, timeout_sec=0.1)
+            executor.spin_once(timeout_sec=0.1)
             found = conflicts(
                 [name for name, _ in node.get_node_names_and_namespaces()],
                 [p.node_name for p in node.get_publishers_info_by_topic('/cmd_vel')])
@@ -53,6 +57,8 @@ def preflight(_launch_context, *args, **kwargs):
         os.close(descriptor)
         raise
     finally:
+        if executor is not None:
+            executor.shutdown()
         if node is not None:
             node.destroy_node()
         if context.ok():
