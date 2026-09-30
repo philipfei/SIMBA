@@ -432,14 +432,15 @@ def main(args=None):
     rclpy.init(args=args, signal_handler_options=SignalHandlerOptions.NO)
     node = ExplorationCoordinator()
     previous = {sig: signal.getsignal(sig) for sig in (signal.SIGINT, signal.SIGTERM)}
+    stopping = False
     def interrupted(_signum, _frame):
-        raise KeyboardInterrupt
+        nonlocal stopping
+        stopping = True
     for sig in previous:
         signal.signal(sig, interrupted)
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        while rclpy.ok() and not stopping:
+            rclpy.spin_once(node, timeout_sec=0.05)
     finally:
         node.stop_before_shutdown()
         node.destroy_node()

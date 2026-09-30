@@ -215,3 +215,29 @@ def test_launch_preflight_with_only_private_context():
         capture_output=True, text=True, timeout=10.)
     assert result.returncode == 0, result.stdout + result.stderr
     assert 'Exception ignored' not in result.stderr
+
+
+@pytest.mark.parametrize('module_name,node_name', [
+    ('simba_bringup.exploration_coordinator', 'ExplorationCoordinator'),
+    ('simba_coverage.gate_node', 'SafetyGate')])
+def test_shutdown_signal_does_not_interrupt_executor_callback(monkeypatch, module_name, node_name):
+    import importlib
+    import signal
+    module = importlib.import_module(module_name)
+    handlers, events = {}, []
+    class FakeNode:
+        def stop_before_shutdown(self): events.append('stop')
+        def destroy_node(self): events.append('destroy')
+    monkeypatch.setattr(module, node_name, FakeNode)
+    monkeypatch.setattr(module.rclpy, 'init', lambda **_: None)
+    monkeypatch.setattr(module.rclpy, 'ok', lambda: True)
+    monkeypatch.setattr(module.rclpy, 'shutdown', lambda: events.append('shutdown'))
+    monkeypatch.setattr(module.signal, 'signal', lambda sig, handler: handlers.update({sig: handler}))
+    def spin(*args, **kwargs):
+        handlers[signal.SIGINT](signal.SIGINT, None)
+        events.append('callback completed')
+    monkeypatch.setattr(module.rclpy, 'spin_once', spin)
+    if node_name == 'SafetyGate':
+        monkeypatch.setattr(module, '_stop_before_shutdown', lambda node: node.stop_before_shutdown())
+    module.main()
+    assert events == ['callback completed', 'stop', 'destroy', 'shutdown']

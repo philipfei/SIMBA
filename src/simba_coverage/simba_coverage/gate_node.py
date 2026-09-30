@@ -192,12 +192,14 @@ def main(args=None):
     rclpy.init(args=args,signal_handler_options=SignalHandlerOptions.NO)
     node=SafetyGate()
     previous={sig:signal.getsignal(sig) for sig in (signal.SIGINT,signal.SIGTERM)}
-    def interrupt(_signum,_frame):raise KeyboardInterrupt
+    stopping=False
+    def interrupt(_signum,_frame):
+        nonlocal stopping
+        stopping=True
     for sig in previous:signal.signal(sig,interrupt)
     try:
-        rclpy.spin(node)
-    except KeyboardInterrupt:
-        pass
+        while rclpy.ok() and not stopping:
+            rclpy.spin_once(node,timeout_sec=.05)
     finally:
         _stop_before_shutdown(node)
         node.destroy_node()
