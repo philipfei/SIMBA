@@ -104,6 +104,7 @@ On the PC, after building:
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 python3 -m pytest -q src/simba_coverage/test
+python3 -m pytest -q tools/tests/test_save_map.py
 python3 tools/coverage_tool/tests/regression.py
 ```
 
@@ -238,22 +239,28 @@ ros2 launch simba_bringup rviz.launch.py mode:=slam
 
 Run `keyboard_teleop` in a second PC terminal using the manual command above. RViz uses `/tf_relay` and `/tf_static_relay`; its fixed frame is `map`.
 
-Save a new map on the Pi after pressing `Q` in teleop:
+Save a new map on the Pi after pressing `Q` in teleop. **Keep the SLAM launch running in tmux until saving finishes**: `Q` exits teleop, but stopping SLAM loses the unsaved map. In a second Pi terminal, load the same DDS environment as the launch:
 
 ```bash
-MAP_DIR="/home/create3-pi/SIMBA/maps/room_$(date +%Y%m%d_%H%M)"
-mkdir "$MAP_DIR"
-ros2 run nav2_map_server map_saver_cli -f "$MAP_DIR/map"
-ros2 service call /slam_toolbox/serialize_map slam_toolbox/srv/SerializePoseGraph "{filename: '$MAP_DIR/map'}"
+cd /home/create3-pi/SIMBA
+source /opt/ros/jazzy/setup.bash
+source .env.local
+source install/setup.bash
+python3 tools/save_map.py
 ```
 
-Copy it to the PC:
+The script creates the ignored `maps/` parent directory, uses a 20 s map reception timeout, verifies `.yaml` + `.pgm`, and prints the saved directory. It needs no rebuild. To also save `.posegraph` + `.data` for continued mapping, add `--pose-graph`; that service call has a finite timeout, and failure preserves the map image. The pose graph is not required for AMCL navigation or the PC coverage planner.
+
+If map reception fails, check `ros2 topic info /map -v` in the same sourced terminal. There must be a live SLAM publisher; `manual.launch.py` alone does not produce a map. Check the SLAM tmux logs and matching `ROS_DOMAIN_ID` / DDS configuration if the publisher or `/slam_toolbox/serialize_map` service is absent. Increasing the timeout cannot recover a map from a stopped SLAM process.
+
+Copy it from a **PC terminal**, replacing `ROOM_NAME` with the directory printed by the save command:
 
 ```bash
-scp -o HostKeyAlias=create3-pi.local -r create3-pi@create3-pi.local:/home/create3-pi/SIMBA/maps/ROOM_NAME /path/to/SIMBA/maps/
+mkdir -p /home/philip/Documents/SIMBA/maps
+scp -o HostKeyAlias=create3-pi.local -r create3-pi@create3-pi.local:/home/create3-pi/SIMBA/maps/ROOM_NAME /home/philip/Documents/SIMBA/maps/
 ```
 
-## Exploration: Undock, teleop, H return home, Dock
+## Exploration: Undock, teleop, H return home, Dock + map saving
 
 This mode uses Create 3's native `/undock` and `/dock` actions. Nav2's `ComputePathToPose` and `FollowPath` handle the return route. Each session starts **on the powered dock with a fresh SLAM map**; saved pose graphs, mid-session restart recovery and multiple docks are unsupported. Do not move the dock during the session.
 
@@ -261,32 +268,30 @@ This mode uses Create 3's native `/undock` and `/dock` actions. Nav2's `ComputeP
 
 ### Upload and build updates
 
-On the PC, review and push the changes on `main`:
+On the PC, update to the published `main` and rebuild before starting RViz or teleop:
 
 ```bash
 cd /home/philip/Documents/SIMBA
 source /opt/ros/jazzy/setup.bash
+git checkout main
+git pull --ff-only origin main
 source /home/philip/Documents/SIMBA/.env.local
-source /home/philip/Documents/SIMBA/install/setup.bash
-git diff
-git add src README.md
-git commit -m "Add exploration and one-key return to dock"
-git push origin main
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
+source /home/philip/Documents/SIMBA/install/setup.bash
 ```
 
-On the Pi, stop the old SIMBA session, then update and rebuild:
+On the Pi, save any map you want to keep before stopping the old SIMBA session. Then update and rebuild before starting a fresh session from the powered dock:
 
 ```bash
 cd /home/create3-pi/SIMBA
 source /opt/ros/jazzy/setup.bash
-source /home/create3-pi/SIMBA/.env.local
-source /home/create3-pi/SIMBA/install/setup.bash
 git checkout main
 git pull --ff-only origin main
+source /home/create3-pi/SIMBA/.env.local
 rosdep install --from-paths src --ignore-src -r -y
 colcon build --symlink-install
+source /home/create3-pi/SIMBA/install/setup.bash
 ```
 
 These update commands assume the workspace is already installed; use the earlier first-installation instructions for a new checkout. The new direct dependencies are `nav2_msgs` and `action_msgs`; all hardware/navigation dependencies remain apt/rosdep-managed.
@@ -396,6 +401,40 @@ After stopping for H, wait up to 6 s for a newly received map with a timestamp n
 Corrections above 0.10 m or 10 degrees stop navigation, then wait for 2 s stable TF and a post-stop map before replanning. TF older than 0.5 s stops navigation; continued loss for 2 s fails. A third correction episode within 30 s, no stabilization within 10 s, or more than two correction recoveries per H fails. Correction recovery and the one path-failure retry are separate. Native actions retain sensor/action/lease supervision without depending on SLAM map continuity.
 
 A fresh SLAM session does not bound drift of a historical dock pose after loop closure. Current map-to-odom corrections are not blindly applied to the stored dock pose. There is no custom IR search or raw-velocity approach fallback: invisible/unreachable docks stop with a reason for manual recovery. Measure physical error during the acceptance runs.
+
+### Save the exploration map and copy it to the PC
+
+For a complete run: start Exploration from the powered dock, wait for Undock and `MANUAL`, drive with lowercase w/s/a/d, press H, and wait for `DOCKED` with the robot physically on the dock. Then press Q to exit the PC teleop. **Leave the Pi Exploration launch running while saving**: `DOCKED` ends the motion session, but SLAM must remain alive to publish the map. Do not start a separate `slam.launch.py` or restart Exploration before saving.
+
+In a **second Pi terminal**, save the live `/map`:
+
+```bash
+cd /home/create3-pi/SIMBA
+source /opt/ros/jazzy/setup.bash
+source /home/create3-pi/SIMBA/.env.local
+source /home/create3-pi/SIMBA/install/setup.bash
+python3 tools/save_map.py
+```
+
+Wait for `Map image saved` and `Ready to copy this directory`. The script creates `maps/room_YYYYMMDD_HHMMSS/` including missing parent directories, waits up to 20 s for a map (30 s total for the map saver process), and verifies nonempty `map.yaml` and `map.pgm`. It refuses to overwrite existing map files. If it fails, keep the launch running and resolve the reported problem before retrying with a new directory.
+
+The default saves only the map image needed by AMCL and the PC coverage planner. Optional `python3 tools/save_map.py --pose-graph` also saves SLAM state with a bounded service wait; it is not needed for this workflow and does not enable restarting an Exploration session from a saved graph. If serialization fails, the saved image files remain usable.
+
+In a **PC terminal**, replace `ROOM_NAME` below with the directory name printed on the Pi, for example `room_20261001_143000`:
+
+```bash
+cd /home/philip/Documents/SIMBA
+mkdir -p maps
+scp -o HostKeyAlias=create3-pi.local -r \
+  create3-pi@create3-pi.local:/home/create3-pi/SIMBA/maps/ROOM_NAME \
+  /home/philip/Documents/SIMBA/maps/
+ls -lh /home/philip/Documents/SIMBA/maps/ROOM_NAME/map.yaml \
+  /home/philip/Documents/SIMBA/maps/ROOM_NAME/map.pgm
+```
+
+After copying succeeds and both files are present on the PC, stop the Pi Exploration launch with Ctrl-C in its tmux pane. Maps are ignored by Git, so `git pull` does not transfer them. Keep the YAML and its image together.
+
+If saving reports `Failed to spin map subscription`, run `ros2 topic info /map -v` in the same sourced Pi terminal and inspect the Exploration tmux logs. No publisher means SLAM is stopped, failed to start, or is invisible under this terminal's DDS settings; a publisher without received data also requires checking map publication and QoS. A command waiting for `/slam_toolbox/serialize_map` means the service is not visible: check `ros2 service list` and the same environment. The helper bounds these waits instead of hanging indefinitely.
 
 ### Troubleshooting
 
