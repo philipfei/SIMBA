@@ -8,6 +8,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 from simba_coverage.params import load_settings
+from simba_bringup.mode_guard import preflight
 
 CONTROLLER_REMAPS = [('cmd_vel', '/cmd_vel_nav'), ('/cmd_vel', '/cmd_vel_nav')]
 
@@ -79,5 +80,6 @@ def generate_launch_description():
                               description='coverage_tool export to drive instead of on-robot planning'),
         DeclareLaunchArgument('lidar_driver', default_value='true'),
         DeclareLaunchArgument('nav2_stamped_supported', default_value='true'),
+        OpaqueFunction(function=preflight),
         OpaqueFunction(function=_setup),
     ])

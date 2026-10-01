@@ -1,0 +1,21 @@
+# Exploration-only settings; these do not change fixed-map coverage approval hashes.
+approach_offsets_m: [0.65, 0.75, 0.55]
+approach_margin_m: 0.05
+handoff_xy_m: 0.05
+handoff_yaw_rad: 0.05
+map_wait_s: 6.0
+costmap_wait_s: 2.0
+tf_age_s: 0.5
+tf_lost_s: 2.0
+settle_s: 2.0
+settle_timeout_s: 10.0
+jump_translation_m: 0.10
+jump_rotation_deg: 10.0
+jump_window_s: 30.0
+max_jump_recoveries: 2
+max_navigation_retries: 1
+state_period_s: 0.5
+navigation:
+  planner_tolerance_m: 0.05
+  goal_xy_m: 0.03
+  goal_yaw_rad: 0.05
