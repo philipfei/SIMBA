@@ -39,6 +39,7 @@ class ExplorationTeleop(KeyboardTeleop):
         self.last_printed = None
         self.return_home = self.create_client(Trigger, '/exploration/return_home')
         self.cancel = self.create_client(Trigger, '/exploration/cancel')
+        self.safety_reset = self.create_client(Trigger, '/safety/reset_all')
         self.create_subscription(String, '/exploration/state', self.receive_state, LATCHED)
         self.create_timer(0.1, self.lease_heartbeat)
 
@@ -89,12 +90,12 @@ class ExplorationTeleop(KeyboardTeleop):
             rclpy.spin_once(self, timeout_sec=0.05)
         return bool(condition())
 
-    def trigger(self, client):
+    def trigger(self, client, label='Coordinator command'):
         if not client.wait_for_service(timeout_sec=0.5):
-            raise RuntimeError('Coordinator unavailable; use the physical robot stop if needed')
+            raise RuntimeError(label + ' service unavailable; use the physical robot stop if needed')
         future = client.call_async(Trigger.Request())
         if not self.pump_until(future.done):
-            raise RuntimeError('Command acknowledgement timed out; physical stop may be required')
+            raise RuntimeError(label + ' acknowledgement timed out; physical stop may be required')
         response = future.result()
         if response is None or not response.success:
             raise RuntimeError(response.message if response else 'Command failed')
@@ -112,7 +113,12 @@ class ExplorationTeleop(KeyboardTeleop):
             display('\r\nExploration state is stale; movement/return disabled.', flush=True)
             return
         action = key_action(self.state['phase'], key)
-        if action == 'return':
+        if action == 'reset':
+            self.reset_safety()
+        elif action == 'reset_blocked':
+            display('\r\nShift+R requires MANUAL or FAILED. Cancel with X and wait for '
+                    'the robot to stop before resetting.', flush=True)
+        elif action == 'return':
             self.release()
             if not self.pump_until(lambda: self.fresh() and (self.state.get('owner') == 'NONE' or self.state.get('phase') == 'DOCKED')):
                 raise RuntimeError('Gate NONE not confirmed; return was not requested')
@@ -138,6 +144,31 @@ class ExplorationTeleop(KeyboardTeleop):
                     ' / ' + self.state.get('subphase', '') + ' / ' + self.state.get('reason', ''), flush=True)
         elif action == 'busy':
             display('\r\nReturn unavailable in this phase; H is not queued.', flush=True)
+
+    def reset_safety(self):
+        self.release()
+        if not self.pump_until(lambda: self.fresh() and self.state.get('owner') == 'NONE'
+                              and self.state.get('stopped') and self.state.get('action_idle')):
+            raise RuntimeError('Reset refused: stopped robot, idle actions and gate NONE '
+                               'were not confirmed. Use X to cancel and wait before Shift+R.')
+        self.trigger(self.safety_reset, '/safety/reset_all')
+        # Resetting a latch does not acknowledge the coordinator's FAILED phase.
+        # Use its existing cancellation/acknowledgement path; never request motion.
+        if self.state.get('phase') == 'FAILED':
+            if not self.state.get('home_valid'):
+                display('\r\nReset requested; HOME_INVALID remains. Recover to the dock '
+                        'and relaunch Exploration.', flush=True)
+                return
+            self.trigger(self.cancel)
+            if not self.pump_until(lambda: self.fresh()
+                                  and self.state.get('phase') == 'MANUAL'
+                                  and self.state.get('stopped') and self.state.get('action_idle')
+                                  and self.state.get('owner') == 'NONE'):
+                raise RuntimeError('Reset requested; MANUAL readiness not confirmed. '
+                                   'Inspect the current state; no movement was requested.')
+        display('\r\nReset requested; wait for clear safety state / enabled wheels. '
+                'Press a fresh w/s/a/d key to drive or H to return; neither is automatic.',
+                flush=True)
 
     def tick(self):
         if self.granted and self.fresh() and self.state.get('phase') == 'MANUAL':
@@ -184,7 +215,8 @@ def run(parsed, ros_args):
         exit_kind['value'] = 'detach' if sig == signal.SIGHUP else 'quit'
     for sig in previous:
         signal.signal(sig, interrupted)
-    display('w/s/a/d move; H return home; X/Space cancel/stop; Q stop and exit; Shift+D detach.\n'
+    display('w/s/a/d move; H return home; X/Space cancel/stop; Shift+R reset safety; '
+          'Q stop and exit; Shift+D detach.\n'
           'Detach or PC loss lets an active return continue. Use physical stop when disconnected.', flush=True)
     try:
         if parsed.rviz:

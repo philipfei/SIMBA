@@ -44,9 +44,11 @@ def at_home(pose, home, profile):
 
 
 def key_action(phase, key):
-    """Uppercase D detaches; lowercase d retains the existing right turn."""
+    """Uppercase D detaches and R resets; lowercase d retains right turn."""
     if key == 'D':
         return 'detach'
+    if key == 'R':
+        return 'reset' if phase in ('MANUAL', 'FAILED') else 'reset_blocked'
     key = key.lower()
     if key == 'q':
         return 'quit'

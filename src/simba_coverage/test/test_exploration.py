@@ -40,13 +40,14 @@ def ready_manual():
 
 
 @pytest.mark.parametrize('phase', PHASES)
-@pytest.mark.parametrize('key', ['w', 's', 'a', 'd', 'h', 'x', ' ', 'q', 'D'])
+@pytest.mark.parametrize('key', ['w', 's', 'a', 'd', 'h', 'x', ' ', 'q', 'D', 'R', 'r'])
 def test_state_table_keys(phase, key):
     action = key_action(phase, key)
     expected = ('detach' if key == 'D' else 'quit' if key == 'q' else
+                ('reset' if phase in ('MANUAL', 'FAILED') else 'reset_blocked') if key == 'R' else
                 ('stop' if phase == 'MANUAL' else 'cancel') if key in ('x', ' ') else
                 ('return' if phase in ('MANUAL', 'FAILED', 'DOCKED') else 'busy') if key == 'h' else
-                'move' if phase == 'MANUAL' else 'ignore')
+                'move' if key in ('w', 's', 'a', 'd') and phase == 'MANUAL' else 'ignore')
     assert action == expected
 
 

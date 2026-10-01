@@ -38,6 +38,7 @@ class SafetyGate(Node):
         self.create_subscription(String,'/coverage/trust',self.trust,LATEST)
         self.create_subscription(EmptyMsg,'/control/manual_heartbeat',self.manual_heartbeat,10)
         self.create_service(Trigger,'/safety/reset',self.reset)
+        self.create_service(Trigger,'/safety/reset_all',self.reset_all)
         self.create_service(Trigger,'/safety/estop',self.stop_service)
         if self.mapping and not self.supervised_mapping:self.create_service(SetBool,'/control/manual',self.manual)
         self.create_timer(1/self.settings['health']['gate_rate_hz'],self.tick);self.create_timer(self.settings['health']['graph_period_s'],self.check_graph)
@@ -108,7 +109,11 @@ class SafetyGate(Node):
         self.assert_estop('OPERATOR_OR_ACTION_STOP');res.success=True
         res.message='Stop latched; reset and resume are separate';return res
 
-    def reset(self,req,res):
+    def reset_all(self,req,res):
+        """Explicit operator recovery, including externally disabled wheels/E-Stop."""
+        return self.reset(req,res,restore_wheels=True)
+
+    def reset(self,req,res,restore_wheels=False):
         if self.reset_pending:res.success=False;res.message='EStop release pending';return res
         cause=self.inputs.reason();hazards=self.inputs.hazards()
         if cause or hazards.intersection({2,3,4}) or not self.inputs.stopped() or not self.graph_ok:
@@ -116,15 +121,16 @@ class SafetyGate(Node):
         if self.policy.owner!='NONE':
             res.success=False;res.message='Pause/cancel or relinquish manual ownership first';return res
         wheels=self.inputs.messages.get('wheel_status')
-        if not self.owns_estop and (wheels is None or not wheels.wheels_enabled):
+        if not restore_wheels and not self.owns_estop and (wheels is None or not wheels.wheels_enabled):
             res.success=False;res.message='Operator/native disabled wheels: restore externally first';return res
-        if self.owns_estop:
+        if self.owns_estop or restore_wheels:
             if not self.estop.service_is_ready():res.success=False;res.message='EStop service unavailable';return res
             self.reset_pending=True;request=EStop.Request();request.e_stop_on=False
             future=self.estop.call_async(request)
             def done(f):
                 try:
                     if f.result().success:self.owns_estop=False;self.policy.fault='';self.release_grace=time.monotonic()+self.settings['health']['reset_grace_s']
+                    else:self.get_logger().error('Create 3 refused E-Stop release; safety fault remains')
                 except Exception as e:self.get_logger().error(str(e))
                 self.reset_pending=False
             future.add_done_callback(done)
@@ -160,7 +166,7 @@ class SafetyGate(Node):
             msg=Twist();msg.linear.x,msg.angular.z=command;self.pub.publish(msg)
         if self.policy.stopping and now-self.policy.stop_at>self.settings['deadlines']['action_cancel_s'] and not self.inputs.stopped():
             self.assert_estop('STOP_NOT_CONFIRMED')
-        if self.policy.fault and self.owns_estop is False and self.policy.fault!='WHEELS_DISABLED':
+        if self.policy.fault and self.owns_estop is False and not self.reset_pending and self.policy.fault!='WHEELS_DISABLED':
             self.assert_estop(self.policy.fault)
         state={'config_hash':self.settings.hash,'owner':self.policy.owner,'epoch':self.policy.epoch,'healthy':not reason and not self.policy.fault,
                'reason':reason,'fault':self.policy.fault,'stopped':self.inputs.stopped(),

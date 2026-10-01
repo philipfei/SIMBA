@@ -364,7 +364,11 @@ RViz and teleop can attach after Undock: `/exploration/state`, `/exploration/hom
 
 ### Keys and handover
 
-Use **lowercase w/s/a/d** to drive. `H` returns home, `X` or Space stops/cancels, `Q` stops and exits, and **Shift+D** detaches the UI while allowing an autonomous return to continue. Uppercase D is reserved for detach because lowercase d already turns right. The original manual-mode key handling remains unchanged. Manual heartbeat continues while waiting for grant/service acknowledgements; movement is sent only after the gate confirms MANUAL. Movement keys report the blocking phase instead of being silently ignored. The PC exploration UI uses only standard ROS messages/services and does not import Create 3 or Nav2 action messages; those are required by the Pi coordinator.
+Use **lowercase w/s/a/d** to drive. `H` returns home, `X` or Space stops/cancels, **Shift+R** resets safety and restores wheels, `Q` stops and exits, and **Shift+D** detaches the UI while allowing an autonomous return to continue. Uppercase D is reserved for detach because lowercase d already turns right. The original manual-mode key handling remains unchanged. Manual heartbeat continues while waiting for grant/service acknowledgements; movement is sent only after the gate confirms MANUAL. Movement keys report the blocking phase instead of being silently ignored. The PC exploration UI uses only standard ROS messages/services and does not import Create 3 or Nav2 action messages; those are required by the Pi coordinator.
+
+After fixing the reported problem, press **Shift+R** (uppercase `R`, not lowercase `r`) in the PC Exploration teleop. In `MANUAL` or `FAILED`, it releases manual ownership and calls `/safety/reset_all`. The Pi requests `/e_stop` with `e_stop_on: false` even when the wheels were disabled outside SIMBA, and clears the SIMBA latch when Create 3 accepts the release. If Exploration is `FAILED` with a valid home reference, the same key acknowledges the failure so manual control can be requested again. Then press a fresh lowercase w/s/a/d key to drive, or H to retry the return; reset does not send movement or automatically resume a failed return. If an action is still running, use X first and wait for it to stop before Shift+R.
+
+This is explicit operator recovery of E-Stop / disabled wheels and latched faults. It cannot repair missing DDS/sensor data, an active cliff/wheel-drop hazard, a depleted battery, or an invalid home reference; the reported cause must be resolved. `HOME_INVALID` still requires recovery to the dock and a fresh Exploration session. Both PC and Pi must receive this update; restart the PC teleop and Pi launch after deploying it.
 
 Teleop requests and holds MANUAL through `/control/manual` and publishes `/cmd_vel_remote` itself. The Pi coordinator provides that service and arbitrates grants through the existing `/coverage/lease` and `/coverage/trust` internal channels. On H, teleop stops, releases MANUAL, waits for gate NONE, then requests return. Nav2 publishes `/cmd_vel_nav`; the gate remains the sole external `/cmd_vel` publisher. During native Dock/Undock, it stays silent.
 
@@ -460,7 +464,7 @@ ros2 topic echo /dock_status --once --full-length
 | CMD_VEL_OR_NODE_OWNERSHIP_CONFLICT / COORDINATOR_CONFLICT / CONFIG_HASH_MISMATCH | Stop conflicting processes or deploy matching PC/Pi configuration; resolve the graph/configuration before reset. |
 | GATE_SHUTDOWN_DURING_NATIVE / PI_SHUTDOWN / STOP_NOT_CONFIRMED | Confirm physical stopping and native action termination; a gate exiting during a native action requests E-Stop as a shutdown fallback. |
 | HOME_INVALID / UNDOCK_FAILED / UNDOCK_STATUS_DISAGREEMENT | Recover physically/manual as appropriate, place on dock and relaunch. |
-| WHEELS_DISABLED / hazard or E-Stop fault | Stop, clear physical cause, restore wheels only when safe, then reset the latch explicitly. |
+| WHEELS_DISABLED / hazard or E-Stop fault | Resolve the cause, wait for stopped MANUAL/FAILED, then Shift+R in PC Exploration teleop to release E-Stop, restore wheels and reset the latch. Press a fresh movement key or H afterward. |
 | MAP_STALE / COSTMAP_STALE | Check SLAM map publications, matching global costmap dimensions/origin and Pi load. |
 | APPROACH_UNREACHABLE / NO_PATH / frontier blockage | X to acknowledge; back into known explored space or clear the approach; H again. |
 | FOLLOW_FAILED / PLAN_TIMEOUT / NO_MOVEMENT / RETURN_TIMEOUT | Inspect obstacle/path and Pi load; acknowledge, reposition if needed, then H. |
@@ -474,15 +478,14 @@ ros2 topic echo /dock_status --once --full-length
 | MANUAL_HEARTBEAT_LOST / stale PC status | Reconnect and read current phase; request manual control only when manual-ready. |
 | DOCKED | Normal terminal completion; relaunch from dock for another session. |
 
-If wheels remain disabled, use this full recovery block **only with the robot stopped and hazards clear**, following the existing safety reset rules:
+Shift+R provides wheel restoration and latch reset from the PC Exploration teleop. The equivalent Pi-terminal recovery, with the robot stopped and hazards clear, is:
 
 ```bash
 cd /home/create3-pi/SIMBA
 source /opt/ros/jazzy/setup.bash
 source /home/create3-pi/SIMBA/.env.local
 source /home/create3-pi/SIMBA/install/setup.bash
-ros2 service call /e_stop irobot_create_msgs/srv/EStop '{e_stop_on: false}'
-ros2 service call /safety/reset std_srvs/srv/Trigger '{}'
+ros2 service call /safety/reset_all std_srvs/srv/Trigger '{}'
 ```
 
 ### Offline checks and manual acceptance
