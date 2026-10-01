@@ -130,14 +130,35 @@ class ActionSlot:
     @property
     def idle(self):return not self.records
 
-    def send(self,typ,name,goal):
+    def send(self,typ,name,goal,feedback=None):
         if self.records:raise RuntimeError('Previous action has not terminated')
         client=self.client(typ,name)
         if not client.server_is_ready():raise RuntimeError(name+' server unavailable')
         record={'key':self.mission.action_id(),'name':name,'handle':None,'canceled':False,'cancel_rejected':False,'cancel_sent':False,
                 'sent':time.monotonic(),'cancel_at':None}
         self.records.append(record)
-        try:future=client.send_goal_async(goal)
+        # Feedback from a canceled or superseded goal must not update the current mission.
+        def relay(msg):
+            if feedback and not record['canceled'] and self.mission.current(record['key']):feedback(msg.feedback)
+        try:future=client.send_goal_async(goal,feedback_callback=relay if feedback else None)
+        except Exception:
+            self.records.remove(record);raise
+        future.add_done_callback(lambda f:self.accepted(record,f))
+
+    def replace(self,typ,name,goal,feedback=None):
+        """Send a new goal to the same server while the current one runs (Nav2 preempts it without stopping).
+
+        The new goal keeps the current action key, so the mission token and the gate's lease epoch
+        stay the same; the superseded goal's feedback and result are ignored."""
+        live=[r for r in self.records if not r['canceled']]
+        if len(live)!=1 or live[0]['name']!=name:raise RuntimeError('No running '+name+' goal to replace')
+        old=live[0];old['canceled']=True;old['superseded']=True
+        client=self.client(typ,name)
+        record={'key':old['key'],'name':name,'handle':None,'canceled':False,'sent':time.monotonic(),'cancel_at':None}
+        self.records.append(record)
+        def relay(msg):
+            if feedback and not record['canceled'] and self.mission.current(record['key']):feedback(msg.feedback)
+        try:future=client.send_goal_async(goal,feedback_callback=relay if feedback else None)
         except Exception:
             self.records.remove(record);raise
         future.add_done_callback(lambda f:self.accepted(record,f))
@@ -153,7 +174,8 @@ class ActionSlot:
             h=f.result();r['handle']=h
             if not h.accepted:self.finish(r,6,error='GOAL_REJECTED');return
             h.get_result_async().add_done_callback(lambda x:self.result(r,x))
-            if r['canceled'] or not self.mission.current(r['key']):self.cancel_record(r)
+            # A superseded goal is ended by the server's preemption; cancelling it could hit the new goal.
+            if (r['canceled'] and not r.get('superseded')) or not self.mission.current(r['key']):self.cancel_record(r)
         except Exception as e:self.finish(r,6,error=str(e))
 
     def result(self,r,f):

@@ -20,7 +20,7 @@ from rclpy.action import ActionServer,CancelResponse
 from rclpy.callback_groups import ReentrantCallbackGroup
 from geometry_msgs.msg import Twist,TransformStamped,PoseWithCovarianceStamped
 from nav_msgs.msg import Odometry,OccupancyGrid
-from nav2_msgs.action import FollowPath,ComputePathToPose
+from nav2_msgs.action import FollowPath,ComputePathToPose,NavigateThroughPoses
 from sensor_msgs.msg import LaserScan,BatteryState
 from std_msgs.msg import String
 from std_srvs.srv import Trigger
@@ -32,7 +32,8 @@ from simba_coverage.gate_node import SafetyGate
 from simba_coverage.supervisor import Supervisor
 from simba_coverage.meter import CoverageMeter
 from simba_coverage.state import Mission
-from simba_coverage.params import node_settings,canonical_hash
+from simba_coverage.params import node_settings,canonical_hash,load_settings
+from simba_coverage.planning import densify
 
 
 @pytest.fixture
@@ -288,3 +289,151 @@ def test_new_meter_generation_discards_previous_phase_acknowledgement(ros):
     meter.definition(json_msg({'generation':'new','config_hash':meter.settings.hash,'map_id':meter.base.identity,
                                'denominator':np.flatnonzero(meter.base.free).tolist(),'keepout':[]}))
     assert meter.generation=='new' and meter.last_active_sample_seq==0 and meter.sample_seq==0
+
+
+def run_plan(ros,points,blocked=None,unreachable=None,overshoot=None):
+    """Drive an exported plan through a fake bt_navigator that reports RemovePassedGoals-style feedback.
+
+    Like Nav2, a new goal preempts the running one (which then ends as aborted). `unreachable` stops the
+    robot 0.15 m short of that pose; `overshoot` passes that pose 0.15 m to the side. In both cases the
+    fake never counts the pose as reached and waits, as Nav2 would keep driving back to it."""
+    import yaml
+    assert load_settings()['planning']['through_poses_spacing_m']==.1  # The expected goals below assume this.
+    add,pump,_,tmp_path=ros
+    plan=tmp_path/'plan.yaml'
+    plan.write_text(yaml.safe_dump({'frame_id':'map','poses':[{'x':x,'y':y,'orientation':{'z':0.,'w':1.}} for x,y in points]}))
+    gate=add(SafetyGate());sup=add(Supervisor());meter=add(CoverageMeter());fake=add(FakeInputs())
+    fake.request_owner=None;fake.publish_trust=False;fake.publish_map(sup.base);sup.plan_file=str(plan)
+    goals=[];latest=[0]
+    def navigate(handle):
+        poses=[[p.pose.position.x,p.pose.position.y] for p in handle.request.poses]
+        goals.append((gate.policy.owner,poses));latest[0]+=1;me=latest[0]
+        def superseded():return latest[0]!=me
+        for i,xy in enumerate(poses):
+            if superseded():handle.abort();return NavigateThroughPoses.Result()
+            if blocked and math.dist(xy,blocked)<1e-6:
+                time.sleep(.2);handle.abort();return NavigateThroughPoses.Result(error_code=308,error_msg='NO_VALID_PATH')
+            stuck=None
+            if unreachable and math.dist(xy,unreachable)<1e-6:stuck=np.asarray(xy)+[-.15,0.]
+            if overshoot and math.dist(xy,overshoot)<1e-6:stuck=np.asarray(xy)+[.05,.15]
+            if stuck is not None:
+                fake.x,fake.y=stuck.tolist();end=time.monotonic()+10.
+                while not superseded() and not handle.is_cancel_requested and time.monotonic()<end:time.sleep(.05)
+                if handle.is_cancel_requested:handle.canceled()
+                else:handle.abort()
+                return NavigateThroughPoses.Result()
+            # Like RemovePassedGoals: the count drops once a pose is reached, and never below one.
+            fake.x,fake.y=xy;time.sleep(.2)
+            handle.publish_feedback(NavigateThroughPoses.Feedback(number_of_poses_remaining=max(1,len(poses)-i-1)))
+        handle.succeed();return NavigateThroughPoses.Result()
+    server=ActionServer(fake,NavigateThroughPoses,'/navigate_through_poses',execute_callback=navigate,
+                        cancel_callback=lambda _:CancelResponse.ACCEPT,callback_group=ReentrantCallbackGroup())
+    sup.settings.values['recovery']['plan_pose_timeout_s']=1.5  # Keep the test short; behaviour is unchanged.
+    end=time.monotonic()+15.
+    while not (sup.trusted and sup.config_ready()) and time.monotonic()<end:pump(.2)
+    assert sup.trusted,sup.trust.reason
+    # Built synchronously: the GIL-bound worker is starved by this test's tight executor loop.
+    sup.grid=sup.make_grid();sup.preview=sup.plan_preview(sup.grid,sup.pose[:2],sup.region)
+    # Sensor messages were not processed while the preview was built; wait until they are fresh again.
+    end=time.monotonic()+10.
+    while not (sup.trusted and not sup.inputs.reason()) and time.monotonic()<end:pump(.2)
+    sup.start()
+    end=time.monotonic()+20.
+    while sup.mission.state not in ('FINISHED','FAILED','PAUSED') and time.monotonic()<end:pump(.2)
+    server.destroy()
+    return sup,goals,plan
+
+
+def test_exported_plan_is_driven_through_poses_and_finishes_without_dock(ros):
+    points=[[2.,2.],[2.6,2.],[2.6,2.6],[2.,2.6]]
+    sup,goals,plan=run_plan(ros,points)
+    assert sup.mission.state=='FINISHED' and sup.mission.reason=='PLAN_COMPLETE',(sup.mission.state,sup.mission.reason,sup.mission.events)
+    # One NavigateThroughPoses goal per chunk, sent while the gate lease is NAV, with the plan densified in order.
+    assert [owner for owner,_ in goals]==['NAV'] and np.allclose(goals[0][1],densify(points,.1))
+    report=json.loads((sup.output/('task_'+sup.mission.generation+'.json')).read_text())
+    assert report['plan_file']==str(plan) and not report['temporary_blockages']
+
+
+def test_blocked_plan_pose_is_retried_from_there_then_skipped(ros):
+    points=[[1.,1.],[2.,1.],[2.,2.],[1.,2.]]
+    sup,goals,_=run_plan(ros,points,blocked=[2.,2.])
+    assert sup.mission.state=='FINISHED' and sup.mission.reason=='PLAN_COMPLETE',(sup.mission.state,sup.mission.reason,sup.mission.events)
+    # Retry resumes at the unreached pose instead of the chunk start; the second failure skips it
+    # and the densified poses within blockage_radius_m (0.25 m) of it.
+    dense=np.round(densify(points,.1),3).tolist()
+    blocked=dense.index([2.,2.])
+    assert [np.round(poses,3).tolist() for _,poses in goals]==[dense,dense[blocked:],dense[blocked+3:]]
+    assert all(owner=='NAV' for owner,_ in goals)
+    assert sup.mission.failures=={'pose:2.000,2.000':2}
+    assert [(b['xy'],b['reason']) for b in sup.mission.blocked]==[([2.,2.],'PLAN_POSE_SKIPPED')]
+    assert [e.get('skipped',False) for e in sup.mission.events if 'target' in e]==[False,True]
+    assert sup.mission.root_cause.startswith('NAVIGATE_THROUGH_POSES_ERROR_308')
+
+
+def test_pause_mid_chunk_resumes_at_next_unreached_plan_pose(ros):
+    from simba_coverage.planning import poly_target
+    add,_,_,_=ros;sup=add(Supervisor());sup.plan_file='plan.yaml'
+    points=[[1.,1.],[2.,1.],[2.,2.],[1.,2.]]
+    sup.mission.start(time.monotonic());sup.mission.state='THROUGH'
+    sup.current=poly_target(points,'plan');sup.through_points=points;sup.through_remaining=len(points)
+    for remaining in (3,2,3):sup.through_feedback(NavigateThroughPoses.Feedback(number_of_poses_remaining=remaining))
+    assert sup.through_remaining==2
+    sup.pause('OPERATOR_PAUSE')
+    assert sup.mission.state=='PAUSED' and sup.current.points==points[2:]
+
+
+def test_unreachable_plan_pose_is_tried_then_skipped_alone(ros):
+    points=[[1.,1.],[2.,1.],[2.,2.]]
+    sup,goals,_=run_plan(ros,points,unreachable=[2.,1.])
+    assert sup.mission.state=='FINISHED' and sup.mission.reason=='PLAN_COMPLETE',(sup.mission.state,sup.mission.reason,sup.mission.events)
+    dense=np.round(densify(points,.1),3).tolist();corner=dense.index([2.,1.])
+    # The second goal starts at the very next pose: only the unreachable one is dropped.
+    assert [np.round(poses,3).tolist() for _,poses in goals]==[dense,dense[corner+1:]]
+    assert [(b['xy'],b['reason'],b['cause']) for b in sup.mission.blocked]==[([2.,1.],'PLAN_POSE_SKIPPED','POSE_TIMEOUT')]
+    assert not sup.mission.failures
+
+
+def test_pose_stuck_needs_the_robot_near_and_times_out_or_turns(ros):
+    from simba_coverage.planning import poly_target
+    add,_,_,_=ros;sup=add(Supervisor());sup.plan_file='plan.yaml'
+    r=sup.settings['recovery'];points=[[1.,1.],[1.1,1.],[1.2,1.]]
+    sup.current=poly_target(points,'plan');sup.through_points=points;sup.through_remaining=3
+    sup.pose=[3.,3.,0.]
+    assert sup.pose_stuck(0.)=='' and sup.pose_stuck(100.)=='' and sup.pose_near_since is None  # Far away: not trying yet.
+    sup.pose=[1.,1.2,0.]
+    assert sup.pose_stuck(0.)=='' and sup.pose_stuck(r['plan_pose_timeout_s']-.1)==''
+    assert sup.pose_stuck(r['plan_pose_timeout_s'])=='POSE_TIMEOUT'
+    sup.pose_near_since=None;sup.pose_stuck(0.)
+    for k in range(1,12):
+        sup.pose=[1.,1.2,math.remainder(k*.5,2*math.pi)];result=sup.pose_stuck(.1*k)
+    assert result=='POSE_TURNING' and sup.pose_turn>=r['plan_pose_turn_limit_rad']
+    sup.through_feedback(NavigateThroughPoses.Feedback(number_of_poses_remaining=2))
+    assert sup.pose_near_since is None  # Reaching a pose restarts the attempt for the next one.
+
+
+def test_pose_passed_just_outside_the_radius_is_dropped_without_a_skip(ros):
+    points=[[1.,1.],[2.,1.],[2.,2.]]
+    sup,goals,_=run_plan(ros,points,overshoot=[1.5,1.])
+    assert sup.mission.state=='FINISHED' and sup.mission.reason=='PLAN_COMPLETE',(sup.mission.state,sup.mission.reason,sup.mission.events)
+    dense=np.round(densify(points,.1),3).tolist();passed=dense.index([1.5,1.])
+    # The robot is beside the next segment, so the pose is behind it: the goal is replaced from the next pose on.
+    assert [np.round(poses,3).tolist() for _,poses in goals]==[dense,dense[passed+1:]]
+    assert all(owner=='NAV' for owner,_ in goals)
+    assert not sup.mission.blocked and not sup.mission.failures and not sup.mission.events[:-1]
+
+
+def test_passed_poses_geometry(ros):
+    from simba_coverage.planning import poly_target
+    add,_,_,_=ros;sup=add(Supervisor());sup.plan_file='plan.yaml'
+    line=[[1.+.1*i,1.] for i in range(30)]
+    sup.current=poly_target(line,'plan');sup.through_points=line;sup.through_remaining=len(line)
+    def passed(x,y):sup.pose=[x,y,0.];return sup.passed_poses()
+    assert passed(1.35,.9)==0                           # On the way to the chunk start: not judged yet.
+    sup.chunk_started=True
+    assert passed(.8,1.)==0 and passed(1.,1.)==0      # Not yet past the first pose.
+    assert passed(1.02,1.12)==1                         # Just past it, 12 cm to the side: outside the 0.10 m radius.
+    assert passed(1.35,.9)==4                           # Beside the segment after the 4th pose.
+    assert passed(1.35,1.4)==0                          # Too far from the plan line to judge.
+    assert passed(2.5,1.)==0                            # Beyond the look-ahead window: a later part of the plan.
+    # Counted from the next unreached pose (1.5, 1); (1.6, 1) is behind but within 0.10 m, so Nav2 drops it itself.
+    sup.through_remaining=25;assert passed(1.62,1.)==1

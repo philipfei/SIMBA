@@ -13,7 +13,7 @@ from rclpy.signals import SignalHandlerOptions
 from rclpy.time import Time
 from geometry_msgs.msg import PoseWithCovarianceStamped, PoseStamped
 from nav_msgs.msg import OccupancyGrid, Path as PathMsg
-from nav2_msgs.action import ComputePathToPose, FollowPath
+from nav2_msgs.action import ComputePathToPose, FollowPath, NavigateThroughPoses
 from irobot_create_msgs.action import Dock, Undock
 from std_msgs.msg import String
 from std_srvs.srv import Trigger, SetBool, Empty
@@ -23,12 +23,13 @@ from .geometry import Grid, validate_polygon, wrap
 from .planner import sweeps, ordered, gap_targets
 from .state import Mission
 from .params import node_settings, approval_manifest, canonical_hash
-from .planning import optimize, boundary_routes, connect, points_of, split_path, trim_stripes, length
+from .planning import optimize, boundary_routes, connect, densify, points_of, poly_target, split_path, trim_stripes, length
 from .health import Trust
+from .plan_file import load_plan
 from .ros_common import (Inputs, ActionSlot, LATCHED, LATEST, parameter, decode, json_msg,
                          diagnostic, pose_msg, path_msg, pose3, transform3, yaw, ros_now, stamp_seconds)
 
-ACTIVE={'UNDOCK','CONNECT_PLAN','CONNECT','SWEEP','DWELL','GAP_PLANNING','BUMP_WAIT',
+ACTIVE={'UNDOCK','CONNECT_PLAN','CONNECT','SWEEP','THROUGH','DWELL','GAP_PLANNING','BUMP_WAIT',
         'PHASE_WAIT','RETURN_PLAN','RETURN','DOCK_WAIT','DOCK','TEST_PLAN','TEST','NATIVE_ARM','DOCK_CONFIRM'}
 
 
@@ -37,6 +38,8 @@ class Supervisor(Node):
         super().__init__('coverage_supervisor')
         self.settings=node_settings(self);cfg=self.settings
         self.approved_hash=self.declare_parameter('approved_hash','').value
+        # A reviewed coverage_tool export replaces on-robot planning and approval.
+        self.plan_file=self.declare_parameter('plan_file','').value
         self.map_frame=cfg['runtime']['map_frame'];self.odom_frame=cfg['runtime']['odom_frame'];self.base_frame=cfg['runtime']['base_frame']
         self.base=Grid.load(cfg['runtime']['map_yaml']);self.grid=self.base
         h,w=self.base.cells.shape
@@ -47,7 +50,7 @@ class Supervisor(Node):
         self.coverage_phase='MAIN';self.sample_seq=0;self.phase_barrier=0;self.meter_config_hash=''
         self.trim_residual=[];self.phase_checks=[];self.work_previous_phase='MAIN';self.work_previous_round=0;self.work_previous_round_area=0.
         self.inputs=Inputs(self);self.mission=Mission(recovery=self.settings['recovery']);self.slot=ActionSlot(self,self.mission)
-        for typ,name in [(ComputePathToPose,'/compute_path_to_pose'),(FollowPath,'/follow_path'),(Dock,'/dock'),(Undock,'/undock')]:
+        for typ,name in [(ComputePathToPose,'/compute_path_to_pose'),(FollowPath,'/follow_path'),(NavigateThroughPoses,'/navigate_through_poses'),(Dock,'/dock'),(Undock,'/undock')]:
             self.slot.client(typ,name)
         self.trust=Trust(self.settings);self.trusted=False;self.pose=None;self.odom_pose=None;self.amcl=None
         self.live_map=False;self.amcl_received=0.;self.scan_stamp=None;self.scan_score=(0,0)
@@ -58,6 +61,7 @@ class Supervisor(Node):
         self.return_since=0.;self.round_start_area=0.;self.gain_area=0.;self.no_gain=0.;self.last_tick=time.monotonic()
         self.bump_since=None;self.bump_clear=None;self.bump_locations=[];self.before_bump=''
         self.pending_native=None;self.pending_phase=None;self.path=None;self.path_end_yaw=None;self.test_goal=None
+        self.through_points=[];self.through_remaining=0;self.pose_near_since=None;self.pose_turn=0.;self.pose_yaw=0.;self.last_replace=0.;self.chunk_started=False
         self.worker_pool=ThreadPoolExecutor(max_workers=1);self.work=None;self.work_kind='';self.work_key=None
         self.dock={};self.load_dock()
         self.lease_pub=self.create_publisher(String,'/coverage/lease',LATEST)
@@ -154,7 +158,7 @@ class Supervisor(Node):
         if self.mission.generation:
             self.sample_seq+=1
             self.sample_pub.publish(json_msg({'generation':self.mission.generation,'sample_seq':self.sample_seq,'stamp':ros_now(self)-self.settings['localization']['tf_delay_s'],
-                'pose':pose or [0.,0.,0.],'trusted':self.trusted,'active':self.mission.state in ('CONNECT','SWEEP','DWELL','RETURN','PHASE_WAIT') and not self.manual}))
+                'pose':pose or [0.,0.,0.],'trusted':self.trusted,'active':self.mission.state in ('CONNECT','SWEEP','THROUGH','DWELL','RETURN','PHASE_WAIT') and not self.manual}))
 
     def stationary_update(self):
         if self.inputs.stopped() and self.nomotion.service_is_ready() and not self.nomotion_pending:
@@ -186,7 +190,7 @@ class Supervisor(Node):
         self.idle_for_edit()
         if not self.trusted:raise ValueError('Localize first, or use the separate offline preview tool')
         start=self.pose[:2]
-        if self.is_docked():self.check_dock(False);start=self.dock['staging'][:2]
+        if self.is_docked() and (not self.plan_file or self.dock.get('staging')):self.check_dock(False);start=self.dock['staging'][:2]
         self.grid=self.make_grid();grid=self.grid;polygon=list(self.region)
         self.preview=None
         def build():
@@ -202,13 +206,41 @@ class Supervisor(Node):
                     'stripes':plan['targets'],'boundary':boundary,'boundary_audit':audit,'candidates':plan['candidates'],
                     'selected':plan['selected'],'walls':plan['walls'],'config_hash':self.settings.hash,
                     'approval_manifest':manifest,'approval_hash':manifest['approval_hash']}
+        if self.plan_file:build=lambda:self.plan_preview(grid,start,polygon)
         self.work=self.worker_pool.submit(build);self.work_kind='preview';self.work_key=None
         return 'Preview calculation queued; inspect /coverage/status and route before start'
 
+    def plan_preview(self,grid,start,polygon):
+        plan=load_plan(self.plan_file,grid,self.settings['runtime']['map_yaml'],self.map_frame,self.collision,
+                       self.settings['planning']['through_poses_chunk_m'])
+        reachable=grid.reachable(start,self.collision,self.settings['recovery']['planner_start_tolerance_m'])
+        first=grid.cell(plan['points'][0])
+        if not grid.valid(first) or not reachable[first]:raise ValueError('PLAN_START_UNREACHABLE from the robot position')
+        return {'reachable':reachable,'denominator':grid.coverable(reachable,polygon,self.radius),'targets':plan['targets'],
+                'connections':[[] for _ in plan['targets']],'start':start,'stripes':[],'boundary':[],
+                'config_hash':self.settings.hash,'plan_file':str(self.plan_file),'plan_sha256':plan['plan_sha256']}
+
     def start(self):
-        self.ready(require_dock=True)
+        self.ready(require_dock=not self.plan_file)
         if self.preview is None or self.work is not None:raise ValueError('A completed preview is required')
         if self.preview.get('config_hash')!=self.settings.hash:raise ValueError('PREVIEW_CONFIG_STALE: regenerate preview')
+        if not self.plan_file:self.check_approval()
+        if not self.config_ready():raise ValueError('CONFIG_HASH_MISMATCH')
+        if self.inputs.messages['battery_state'].percentage<self.settings['battery']['start_ratio']:raise ValueError(f"Start requires battery >= {100*self.settings['battery']['start_ratio']:g}%")
+        if not self.inputs.fresh('dock_status',self.settings['health']['dock_age_s']):raise ValueError('DOCK_STATUS_STALE')
+        if not self.is_docked():self.check_start_component()
+        self.mission.start(time.monotonic(),self.timeout)
+        self.definition={'generation':self.mission.generation,'map_id':self.base.identity,
+                         'config_hash':self.settings.hash,'denominator':np.flatnonzero(self.preview['denominator']).tolist(),'keepout':self.keepout}
+        self.definition_pub.publish(json_msg(self.definition));self.measurement={};self.meter_time=0.
+        self.coverage_phase='PLAN' if self.plan_file else 'BOUNDARY' if self.settings['boundary']['enabled'] else 'MAIN'
+        self.phase_checks=[];self.trim_residual=[]
+        self.targets=list(self.preview.get('boundary',[])) if self.coverage_phase=='BOUNDARY' else list(self.preview['targets']);self.current=None;self.pending_phase='UNDOCK' if self.is_docked() else 'NEXT'
+        self.phase_since=time.monotonic();self.round_start_area=0.;self.gain_area=0.;self.no_gain=0.
+        self.bump_locations=[];self.manual=False
+        return 'Task accepted; preparation checks precede motion'
+
+    def check_approval(self):
         if not self.approved_hash:raise ValueError('APPROVED_HASH_REQUIRED: pass approved_hash to coverage.launch.py')
         approved_file=self.output/'approvals'/(self.approved_hash+'.json')
         if not approved_file.is_file():raise ValueError('APPROVAL_MANIFEST_MISSING: copy the reviewed manifest to '+str(approved_file))
@@ -220,20 +252,6 @@ class Supervisor(Node):
             keys=sorted(set(approved.get('components',{}))|set(runtime.get('components',{})))
             details={k:{'preview':approved.get('components',{}).get(k),'runtime':runtime.get('components',{}).get(k)} for k in keys}
             raise ValueError('APPROVAL_HASH_MISMATCH '+json.dumps(details,sort_keys=True))
-        if not self.config_ready():raise ValueError('CONFIG_HASH_MISMATCH')
-        if self.inputs.messages['battery_state'].percentage<self.settings['battery']['start_ratio']:raise ValueError(f"Start requires battery >= {100*self.settings['battery']['start_ratio']:g}%")
-        if not self.inputs.fresh('dock_status',self.settings['health']['dock_age_s']):raise ValueError('DOCK_STATUS_STALE')
-        if not self.is_docked():self.check_start_component()
-        self.mission.start(time.monotonic(),self.timeout)
-        self.definition={'generation':self.mission.generation,'map_id':self.base.identity,
-                         'config_hash':self.settings.hash,'denominator':np.flatnonzero(self.preview['denominator']).tolist(),'keepout':self.keepout}
-        self.definition_pub.publish(json_msg(self.definition));self.measurement={};self.meter_time=0.
-        self.coverage_phase='BOUNDARY' if self.settings['boundary']['enabled'] else 'MAIN'
-        self.phase_checks=[];self.trim_residual=[]
-        self.targets=list(self.preview.get('boundary',[])) if self.coverage_phase=='BOUNDARY' else list(self.preview['targets']);self.current=None;self.pending_phase='UNDOCK' if self.is_docked() else 'NEXT'
-        self.phase_since=time.monotonic();self.round_start_area=0.;self.gain_area=0.;self.no_gain=0.
-        self.bump_locations=[];self.manual=False
-        return 'Task accepted; preparation checks precede motion'
 
     def check_start_component(self):
         try:
@@ -247,6 +265,7 @@ class Supervisor(Node):
         if self.mission.state not in ACTIVE and self.mission.state!='PREPARING':return
         if self.mission.state=='GAP_PLANNING':
             self.coverage_phase=self.work_previous_phase;self.mission.rounds=self.work_previous_round;self.round_start_area=self.work_previous_round_area
+        if self.plan_file and self.current:self.current=poly_target(self.plan_rest(),'plan')  # Resume continues at the next unreached pose.
         self.slot.cancel();self.pending_phase=None;self.mission.pause(reason,time.monotonic())
         self.save_report()
 
@@ -262,7 +281,7 @@ class Supervisor(Node):
         if self.mission.coverage_finished:self.pending_phase='RETURN'
         else:
             self.check_start_component()
-            if self.current and not self.mission.excluded(self.current):self.targets.insert(0,self.current)
+            if self.current and (self.plan_file or not self.mission.excluded(self.current)):self.targets.insert(0,self.current)
             self.current=None;self.pending_phase='UNDOCK' if self.is_docked() else 'NEXT'
         self.phase_since=time.monotonic();return 'Resume accepted; retained exclusions and original mission deadline'
 
@@ -358,13 +377,104 @@ class Supervisor(Node):
         self.slot.send(FollowPath,'/follow_path',goal)
 
     def next_target(self):
-        self.current=None
+        self.current=None;self.through_points=[]
         while self.targets:
             t=self.targets.pop(0)
-            if not self.mission.excluded(t):self.current=t;break
+            # Exported-plan chunks skip blocked poses themselves (plan_failure) instead of whole chunks.
+            if self.plan_file or not self.mission.excluded(t):self.current=t;break
         if self.current is None:self.finish_pass();return
         self.target_since=time.monotonic()
-        self.plan_to(self.current.start,'CONNECT_PLAN')
+        if self.plan_file:self.through(points_of(self.current))
+        else:self.plan_to(self.current.start,'CONNECT_PLAN')
+
+    def through(self,points):
+        # Nav2's bt_navigator replans through the remaining poses, so it drives to the chunk start and around obstacles.
+        # Dense poses leave the cost-aware planner no room to round the plan off near walls and corners.
+        points=densify(points,self.settings['planning']['through_poses_spacing_m'])
+        goal=NavigateThroughPoses.Goal();goal.poses=path_msg(self,points).poses
+        self.path=[list(p) for p in points];self.through_points=list(self.path);self.through_remaining=len(points)
+        self.pose_near_since=None;self.chunk_started=False
+        self.mission.state='THROUGH';self.phase_since=time.monotonic();self.motion_pose=list(self.pose);self.last_motion=time.monotonic()
+        self.slot.send(NavigateThroughPoses,'/navigate_through_poses',goal,self.through_feedback)
+
+    def through_feedback(self,feedback):
+        # RemovePassedGoals drops reached poses from the front, so the count identifies the next plan pose.
+        remaining=int(feedback.number_of_poses_remaining)
+        if 0<remaining<self.through_remaining:
+            self.through_remaining=remaining;self.target_since=time.monotonic();self.pose_near_since=None;self.chunk_started=True
+
+    def plan_rest(self):
+        if not self.through_points:return points_of(self.current)
+        return self.through_points[len(self.through_points)-self.through_remaining:]
+
+    def passed_poses(self):
+        """Leading poses of the remaining plan that the robot is already past.
+
+        RemovePassedGoals only drops a pose within its radius, so a pose passed just outside it would
+        pull the robot back. The robot is projected onto the next plan_pass_window_m of the plan (it must
+        be within plan_pass_lateral_m of it). A leading pose counts as passed when it lies behind that
+        projection and is farther than plan_pass_min_distance_m from the robot, the RemovePassedGoals
+        radius: closer poses Nav2 drops itself."""
+        # On the way to the chunk start the robot may pass close to a later part of the chunk; that is
+        # not progress along it. Only judge once a pose of this chunk has been reached.
+        if not self.chunk_started:return 0
+        r=self.settings['recovery'];rest=self.plan_rest();p=np.asarray(self.pose[:2]);best=None;along=[0.]
+        for i in range(len(rest)-1):
+            a=np.asarray(rest[i]);ab=np.asarray(rest[i+1])-a;n=float(ab@ab)
+            t=float(np.clip((p-a)@ab/n,0.,1.)) if n>1e-12 else 0.
+            d=float(np.linalg.norm(p-(a+t*ab)))
+            if best is None or d<best[0]-1e-9:best=(d,along[-1]+t*math.sqrt(n))
+            along.append(along[-1]+math.sqrt(n))
+            if along[-1]>=r['plan_pass_window_m']:break
+        if best is None or best[0]>r['plan_pass_lateral_m']:return 0
+        count=0
+        for s,xy in zip(along,rest):
+            if s>=best[1]-1e-9 or math.dist(p,xy)<=r['plan_pass_min_distance_m']:break
+            count+=1
+        return count
+
+    def replace_through(self,points):
+        # Preempt the running goal with the rest of the chunk: no stop, same lease epoch.
+        goal=NavigateThroughPoses.Goal();goal.poses=path_msg(self,points).poses
+        self.path=[list(p) for p in points];self.through_points=list(self.path);self.through_remaining=len(points)
+        self.current=poly_target(points,'plan');self.pose_near_since=None
+        self.target_since=self.last_replace=time.monotonic()
+        self.slot.replace(NavigateThroughPoses,'/navigate_through_poses',goal,self.through_feedback)
+
+    def pose_stuck(self,now):
+        """Next plan pose tried but not reached: timed out or turning on the spot once the robot is near it."""
+        r=self.settings['recovery'];target=self.plan_rest()[0]
+        if math.dist(self.pose[:2],target)>r['plan_pose_near_m']:self.pose_near_since=None;return ''
+        if self.pose_near_since is None:self.pose_near_since=now;self.pose_turn=0.;self.pose_yaw=self.pose[2];return ''
+        self.pose_turn+=abs(wrap(self.pose[2]-self.pose_yaw));self.pose_yaw=self.pose[2]
+        if now-self.pose_near_since>=r['plan_pose_timeout_s']:return 'POSE_TIMEOUT'
+        if self.pose_turn>=r['plan_pose_turn_limit_rad']:return 'POSE_TURNING'
+        return ''
+
+    def skip_pose(self,reason):
+        # Drop only this pose and continue with the next one in line, without stopping.
+        now=time.monotonic();rest=self.plan_rest();skipped=rest[0]
+        self.mission.blocked.append({'xy':list(skipped),'radius':0.,'reason':'PLAN_POSE_SKIPPED','cause':reason,'time':now})
+        self.mission.events.append({'time':now,'target':'pose:%.3f,%.3f'%tuple(skipped),'reason':reason,'skipped':True})
+        if rest[1:]:self.replace_through(rest[1:]);return
+        # The chunk's last pose: end this goal and start the next chunk.
+        self.slot.cancel();self.current=None;self.through_points=[];self.pose_near_since=None
+        self.mission.state='PREPARING';self.pending_phase='NEXT';self.phase_since=now
+
+    def plan_failure(self,reason):
+        # Retry from the next unreached pose; a pose that keeps failing is skipped with its surroundings.
+        self.slot.cancel()
+        if not self.mission.root_cause:self.mission.root_cause=reason
+        now=time.monotonic();rest=self.plan_rest();blocked=rest[0]
+        key='pose:%.3f,%.3f'%tuple(blocked);count=self.mission.failures.get(key,0)+1;self.mission.failures[key]=count
+        event={'time':now,'target':key,'reason':reason}
+        if count>=self.settings['recovery']['target_attempts']:
+            radius=self.settings['recovery']['blockage_radius_m']
+            rest=rest[next((i for i,p in enumerate(rest) if math.dist(p,blocked)>radius),len(rest)):]
+            self.mission.blocked.append({'xy':list(blocked),'radius':radius,'reason':'PLAN_POSE_SKIPPED','time':now});event['skipped']=True
+        if rest:self.targets.insert(0,poly_target(rest,'plan'))
+        self.mission.events.append(event)
+        self.current=None;self.through_points=[];self.mission.state='PREPARING';self.pending_phase='NEXT';self.phase_since=now
 
     def begin_sweep(self):
         t=self.current
@@ -386,6 +496,7 @@ class Supervisor(Node):
         remaining=self.preview['denominator'].copy();remaining.ravel()[self.measurement.get('covered_indices',[])]=False
         self.phase_checks.append({'phase':self.coverage_phase,'round':self.mission.rounds,'fraction':fraction,'sample_seq':self.measurement.get('sample_seq',0)})
         self.work_previous_phase=self.coverage_phase;self.work_previous_round=self.mission.rounds;self.work_previous_round_area=self.round_start_area
+        if self.coverage_phase=='PLAN':self.complete_coverage('PLAN_COMPLETE');return
         if self.coverage_phase=='BOUNDARY':
             self.coverage_phase='MAIN';self.mission.state='GAP_PLANNING'
             def build_main():return trim_stripes(self.grid,self.preview['stripes'],remaining,self.settings)
@@ -410,15 +521,20 @@ class Supervisor(Node):
         self.work_key=(self.mission.generation,self.mission.token);self.phase_since=time.monotonic()
 
     def complete_coverage(self,reason):
-        self.mission.coverage_finished=True;self.mission.reason=reason;self.save_report();self.begin_return()
+        self.mission.coverage_finished=True;self.mission.reason=reason
+        # Plan mode does not require a dock calibration; without one the robot stops where the plan ends.
+        if self.plan_file and not self.dock.get('validated'):self.mission.change('FINISHED',reason,time.monotonic());self.save_report();return
+        self.save_report();self.begin_return()
 
     def begin_return(self):
+        if not self.dock.get('staging'):raise ValueError('NO_DOCK_CALIBRATION: cannot return to dock')
         self.return_since=time.monotonic();self.plan_to(self.dock['staging'][:2],'RETURN_PLAN',self.dock['staging'][2])
 
     def fail(self,reason):
         self.slot.cancel();self.pending_phase=None;self.mission.change('FAILED',reason,time.monotonic());self.save_report()
 
     def target_failure(self,reason):
+        if self.plan_file and self.current:self.plan_failure(reason);return
         self.slot.cancel()
         if not self.mission.root_cause:self.mission.root_cause=reason
         if self.current:
@@ -437,6 +553,7 @@ class Supervisor(Node):
            'coverage_threshold_met':self.measurement.get('fraction',0.)>=self.settings['completion']['target_coverage_ratio'],
            'coverage_phase':self.coverage_phase,'phase_checks':self.phase_checks,'trim_residual':self.trim_residual,
            'config_hash':self.settings.hash,'effective_config':self.settings.values}
+        if self.preview and self.preview.get('plan_file'):d['plan_file']=self.preview['plan_file'];d['plan_sha256']=self.preview['plan_sha256']
         if self.preview:
             roi=self.base.polygon_mask(self.region)&self.base.free
             d['selected_free_m2']=int(roi.sum())*self.base.resolution**2
@@ -448,11 +565,12 @@ class Supervisor(Node):
     def action_result(self,name,status,result,error):
         phase=self.mission.state
         success=status==4 and not error and getattr(result,'error_code',0)==0
-        if success and phase in ('CONNECT','SWEEP','RETURN','TEST') and self.path:
+        if success and phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST') and self.path:
             if math.dist(self.pose[:2],self.path[-1])>self.settings['recovery']['endpoint_tolerance_m']:
                 success=False;error='ACTION_SUCCEEDED_WITHOUT_REACHING_ENDPOINT'
         if not success:
-            if phase in ('CONNECT_PLAN','CONNECT','SWEEP'):self.target_failure(error or 'NAVIGATION_FAILED')
+            if phase=='THROUGH' and not error:error=f"NAVIGATE_THROUGH_POSES_ERROR_{getattr(result,'error_code','')}: {getattr(result,'error_msg','')}"
+            if phase in ('CONNECT_PLAN','CONNECT','SWEEP','THROUGH'):self.target_failure(error or 'NAVIGATION_FAILED')
             else:self.pause(error or 'ACTION_FAILED')
             return
         if phase=='UNDOCK':
@@ -471,7 +589,7 @@ class Supervisor(Node):
             points.insert(0,list(self.pose[:2]))
             self.follow(points,{'CONNECT_PLAN':'CONNECT','RETURN_PLAN':'RETURN','TEST_PLAN':'TEST'}[phase],self.path_end_yaw)
         elif phase=='CONNECT':self.begin_sweep()
-        elif phase=='SWEEP':self.next_target()
+        elif phase in ('SWEEP','THROUGH'):self.next_target()
         elif phase=='RETURN':self.mission.state='DOCK_WAIT';self.phase_since=time.monotonic()
         elif phase=='DOCK':
             if getattr(result,'is_docked',False):
@@ -492,7 +610,7 @@ class Supervisor(Node):
                 if kind=='preview':
                     self.preview=result;self.mission.reason='PREVIEW_READY'
                     self.output.mkdir(parents=True,exist_ok=True)
-                    audit={k:result[k] for k in ('candidates','selected','walls','boundary_audit','config_hash','start')}
+                    audit={k:result[k] for k in ('candidates','selected','walls','boundary_audit','config_hash','start','plan_file','plan_sha256') if k in result}
                     audit['effective_config']=self.settings.values
                     (self.output/'preview_audit.json').write_text(json.dumps(audit,indent=2)+'\n')
                 elif key==(self.mission.generation,self.mission.token) and self.mission.state=='GAP_PLANNING':
@@ -520,7 +638,10 @@ class Supervisor(Node):
                 if fault:self.pause(fault)
                 elif not self.mission.coverage_finished and phase not in ('RETURN_PLAN','RETURN','DOCK_WAIT','DOCK','TEST_PLAN','TEST','DOCK_CONFIRM') and self.inputs.messages['battery_state'].percentage<=self.settings['battery']['return_ratio']:
                     self.slot.cancel();self.mission.coverage_finished=True;self.mission.state='PREPARING';self.pending_phase='RETURN';self.phase_since=now;self.mission.reason='LOW_BATTERY_RETURN'
-                elif phase in ('CONNECT','SWEEP','CONNECT_PLAN') and now-self.target_since>=self.settings['deadlines']['target_s']:self.target_failure('TARGET_TIMEOUT')
+                elif phase=='THROUGH' and now-self.last_replace>=self.settings['recovery']['plan_replace_period_s'] and (passed:=self.passed_poses()):
+                    self.replace_through(self.plan_rest()[passed:])
+                elif phase=='THROUGH' and (stuck:=self.pose_stuck(now)):self.skip_pose(stuck)
+                elif phase in ('CONNECT','SWEEP','THROUGH','CONNECT_PLAN') and now-self.target_since>=self.settings['deadlines']['target_s']:self.target_failure('TARGET_TIMEOUT')
                 elif phase in ('RETURN_PLAN','RETURN') and now-self.return_since>=self.settings['deadlines']['return_s']:self.pause('RETURN_TIMEOUT')
                 elif phase in ('UNDOCK','DOCK') and now>=self.native_deadline:self.pause('NATIVE_ACTION_TIMEOUT')
                 elif phase.endswith('_PLAN') and now-self.phase_since>=self.settings['deadlines']['planning_s']:
@@ -528,13 +649,13 @@ class Supervisor(Node):
                     else:self.pause('PLAN_TIMEOUT')
                 elif phase=='GAP_PLANNING' and now-self.phase_since>=self.settings['deadlines']['planning_s']:self.pause('GAP_PLAN_TIMEOUT')
                 elif phase=='TEST' and now-self.target_since>=self.settings['deadlines']['target_s']:self.pause('TEST_TIMEOUT')
-                elif phase in ('CONNECT','SWEEP','RETURN','TEST'):
+                elif phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST'):
                     if self.motion_pose is None or math.dist(self.pose[:2],self.motion_pose[:2])>=self.settings['recovery']['movement_translation_m'] or abs(wrap(self.pose[2]-self.motion_pose[2]))>=self.settings['recovery']['movement_rotation_rad']:
                         self.motion_pose=list(self.pose);self.last_motion=now
                     if now-self.last_motion>=self.settings['deadlines']['no_motion_s']:
-                        if phase in ('CONNECT','SWEEP'):self.target_failure('NO_MOVEMENT')
+                        if phase in ('CONNECT','SWEEP','THROUGH'):self.target_failure('NO_MOVEMENT')
                         else:self.pause('NO_MOVEMENT')
-                if self.mission.state in ('SWEEP','DWELL'):
+                if self.mission.state in ('SWEEP','THROUGH','DWELL'):
                     area=self.measurement.get('covered_m2',0.)
                     if area>self.gain_area:self.gain_area=area;self.no_gain=0.
                     else:self.no_gain+=max(0,dt)
@@ -577,7 +698,7 @@ class Supervisor(Node):
         except (ValueError,RuntimeError,KeyError) as e:
             self.pause('EXECUTION_CHECK: '+str(e))
         phase=self.mission.state
-        owner='MANUAL' if self.manual else ('NATIVE' if phase in ('UNDOCK','DOCK','NATIVE_ARM') else ('NAV' if phase in ('CONNECT','SWEEP','RETURN','TEST') else 'NONE'))
+        owner='MANUAL' if self.manual else ('NATIVE' if phase in ('UNDOCK','DOCK','NATIVE_ARM') else ('NAV' if phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST') else 'NONE'))
         self.lease_pub.publish(json_msg({'config_hash':self.settings.hash,'owner':owner,'epoch':self.mission.generation+':'+str(self.mission.token)}))
         data={'config_hash':self.settings.hash,'coverage_phase':self.coverage_phase,'generation':self.mission.generation,'state':phase,'reason':self.mission.reason,'root_cause':self.mission.root_cause,
               'trusted':self.trusted,'trust_reason':self.trust.reason,'preview_ready':self.preview is not None,
@@ -588,9 +709,9 @@ class Supervisor(Node):
     def handle_bump(self,now):
         phase=self.mission.state;hazards=self.inputs.hazards()
         if phase in ('UNDOCK','DOCK','NATIVE_ARM','DOCK_CONFIRM'):return  # Native behavior owns its normal bump/proximity handling.
-        if 5 in hazards and phase in ('CONNECT','SWEEP','RETURN','TEST'):
+        if 5 in hazards and phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST'):
             self.pause('OBJECT_PROXIMITY');return
-        if 1 in hazards and phase in ('CONNECT','SWEEP','RETURN','TEST','BUMP_WAIT'):
+        if 1 in hazards and phase in ('CONNECT','SWEEP','THROUGH','RETURN','TEST','BUMP_WAIT'):
             if phase!='BUMP_WAIT':
                 near=sum(math.dist(self.pose[:2],p)<self.settings['recovery']['bump_repeat_radius_m'] for p in self.bump_locations)
                 self.bump_locations.append(list(self.pose[:2]))
@@ -601,7 +722,7 @@ class Supervisor(Node):
         elif phase=='BUMP_WAIT':
             if self.bump_clear is None:self.bump_clear=now
             if now-self.bump_clear>=self.settings['recovery']['bump_clear_s'] and self.slot.idle and self.inputs.stopped():
-                if self.before_bump in ('CONNECT','SWEEP'):self.target_failure('BUMP_REPLAN')
+                if self.before_bump in ('CONNECT','SWEEP','THROUGH'):self.target_failure('BUMP_REPLAN')
                 else:self.pause('BUMP_DURING_RETURN_OR_TEST')
 
     def publish_visuals(self):

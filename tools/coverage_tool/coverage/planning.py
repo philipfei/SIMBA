@@ -31,15 +31,6 @@ def poly_target(points,kind='sweep'):
 def points_of(t):return getattr(t,'points',None) or [t.start,t.end]
 
 
-def densify(points,spacing):
-    """Points at least every `spacing` metres along the polyline, keeping every vertex."""
-    out=[list(points[0])]
-    for a,b in zip(points,points[1:]):
-        n=max(1,math.ceil(math.dist(a,b)/spacing-1e-6))  # Tolerance: densifying twice must not add points.
-        out.extend((np.asarray(a,float)+(np.asarray(b,float)-a)*i/n).tolist() for i in range(1,n+1))
-    return out
-
-
 def split_path(points,maximum,kind):
     # Nav2's endpoint goal checker can accept a closed loop without traversing it.
     # Split at a distinct point before applying the ordinary length limit.
@@ -255,20 +246,17 @@ def optimize(grid,reachable,denominator,start,settings,aligned=True,deadline=Non
                 ts=stripes(grid,reachable,denominator,angle,offset,p['stripe_spacing_m'],settings.collision,settings['geometry']['coverage_disk_radius_m'])
                 if not ts:raise ValueError('No full-length stripes')
                 mask=stroke_union(grid,denominator,ts,settings['geometry']['coverage_disk_radius_m'])
-                # Candidate ranking excludes the start-to-first-stripe entry leg.
-                # This makes direction and phase stable for every start in the same component.
-                links=connect(grid,ts,ts[0].start,reachable,settings.collision)
+                links=connect(grid,ts,start,reachable,settings.collision)
                 route=[]
                 for t,c in zip(ts,links):route.extend(c+points_of(t))
                 record.update(valid=True,coverage_cells=int(mask.sum()),coverage_m2=float(mask.sum()*grid.resolution**2),
                               fragment_count=len(ts),fragment_length_m=sum(length(points_of(t)) for t in ts),
                               connector_length_m=sum(length(c) for c in links),turn_angle_rad=turns(route),
                               estimated_time_s=length(route)/settings['motion']['linear_m_s']+turns(route)/settings['motion']['angular_rad_s'])
-                plans[(angle,float(offset))]=(ts,mask)
+                plans[(angle,float(offset))]=(ts,links,mask)
             except ValueError as e:record['reason']=str(e)
             records.append(record)
-    best=rank_candidates(records,p['area_tie_tolerance_ratio']);ts,mask=plans[(best['angle_deg'],best['offset_m'])]
-    links=connect(grid,ts,start,reachable,settings.collision)
+    best=rank_candidates(records,p['area_tie_tolerance_ratio']);ts,links,mask=plans[(best['angle_deg'],best['offset_m'])]
     return {'targets':ts,'connections':links,'ideal_mask':mask,'candidates':records,'selected':best,'walls':wall,'search_complete':True}
 
 
@@ -301,7 +289,7 @@ def boundary_routes(grid,reachable,polygon,start,settings):
             # At a diagonal contact keep the tight left turn; do not join components.
             incoming=np.array(edge[1])-edge[0]
             def turn(b):
-                d=np.array(b)-v;return -math.atan2(float(np.cross(incoming,d)),float(incoming@d))
+                d=np.array(b)-v;return -math.atan2(float(incoming[0]*d[1]-incoming[1]*d[0]),float(incoming@d))  # 2-D cross (np.cross rejects 2-D vectors in NumPy 2)
             edge=(v,min(choices,key=lambda b:(turn(b),b)))
         pts=[]
         for rc in owners:

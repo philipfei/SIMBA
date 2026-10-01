@@ -189,6 +189,12 @@ class Settings:
             frame_id=runtime['map_frame'], yaml_filename=str(Path(map_yaml).resolve()))
         nav2['global_costmap']['global_costmap']['ros__parameters']['global_frame'] = runtime['map_frame']
         nav2['local_costmap']['local_costmap']['ros__parameters']['global_frame'] = runtime['odom_frame']
+        navigator = nav2['bt_navigator']['ros__parameters']
+        navigator.update(global_frame=runtime['map_frame'], robot_base_frame=runtime['base_frame'])
+        tree = self.config_dir / 'navigate_through_poses.xml'
+        if not tree.is_file():
+            raise ValueError(f'Missing behavior tree: {tree}')
+        navigator['default_nav_through_poses_bt_xml'] = str(tree)
         controller = nav2['controller_server']['ros__parameters']
         controller['FollowPath'].update(
             desired_linear_vel=motion['linear_m_s'],
